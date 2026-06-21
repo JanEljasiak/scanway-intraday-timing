@@ -83,8 +83,48 @@ def compare_models(df: pd.DataFrame, feature_cols: list, cfg: Config) -> pd.Data
             "n_folds": len(results),
         })
 
-    summary = pd.DataFrame(summary_rows).sort_values("avg_f1", ascending=False).reset_index(drop=True)
+    summary = pd.DataFrame(summary_rows).sort_values(
+        "avg_roc_auc", ascending=False, na_position="last"
+    ).reset_index(drop=True)
     return summary
+
+
+def pick_best_model(summary: pd.DataFrame, exclude: tuple[str, ...] = ("baseline_most_frequent",)) -> str:
+    """Wybiera najlepszy model wg avg_roc_auc, ignorujac baseline.
+
+    F1 jest zwodniczy przy niezbalansowanych klasach: model przewidujacy
+    zawsze klase wiekszosciowa dostaje recall=1.0 i wysokie F1, mimo ze
+    ROC AUC=0.5 (brak realnej sily predykcyjnej). ROC AUC mierzy
+    rozdzielczosc modelu niezaleznie od progu i nie da sie go "oszukac"
+    samym predykowaniem jednej klasy.
+    """
+    candidates = summary[~summary["model"].isin(exclude)].dropna(subset=["avg_roc_auc"])
+    if candidates.empty:
+        raise ValueError("Brak kandydatow z policzonym ROC AUC (poza wykluczonymi).")
+    return candidates.sort_values("avg_roc_auc", ascending=False).iloc[0]["model"]
+
+
+def explain_model(model, feature_cols: list) -> pd.DataFrame:
+    """Zwraca sile/kierunek wplywu kazdej cechy, jesli model na to pozwala.
+
+    Dla modeli liniowych (Pipeline ze 'clf') zwraca wspolczynnik (kierunek +
+    sila po standaryzacji). Dla modeli drzewiastych zwraca feature_importances_
+    (sila, bez kierunku). Dla innych (np. KNN, SVM) zwraca puste DataFrame -
+    te modele nie dostarczaja prostej interpretacji per-cecha.
+    """
+    estimator = model.named_steps["clf"] if hasattr(model, "named_steps") else model
+
+    if hasattr(estimator, "coef_"):
+        values = estimator.coef_.ravel()
+        kind = "coef (standaryzowany)"
+    elif hasattr(estimator, "feature_importances_"):
+        values = estimator.feature_importances_
+        kind = "feature_importance"
+    else:
+        return pd.DataFrame(columns=["feature", "value", "kind"])
+
+    out = pd.DataFrame({"feature": feature_cols, "value": values, "kind": kind})
+    return out.sort_values("value", key=abs, ascending=False).reset_index(drop=True)
 
 
 def train_and_save_best(df: pd.DataFrame, feature_cols: list, cfg: Config,
@@ -96,6 +136,14 @@ def train_and_save_best(df: pd.DataFrame, feature_cols: list, cfg: Config,
 
     model = candidates[model_name]
     model.fit(df[feature_cols], df["target_local_top"])
+
+    importance = explain_model(model, feature_cols)
+    if not importance.empty:
+        print(f"\nWplyw cech na decyzje modelu ({importance.iloc[0]['kind']}):")
+        print(importance.to_string(index=False))
+    else:
+        print(f"\nModel '{model_name}' nie udostepnia prostej interpretacji per-cecha "
+              "(np. KNN/SVM) - jego decyzje nie sa latwe do rozlozenia na pojedyncze cechy.")
 
     model_path = cfg.models_dir / "best_model.joblib"
     meta_path = cfg.models_dir / "best_model_meta.json"

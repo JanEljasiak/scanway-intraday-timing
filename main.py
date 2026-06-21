@@ -14,7 +14,7 @@ import argparse
 import pandas as pd
 
 from src.alert import run_live_loop
-from src.backtest import compare_models, train_and_save_best
+from src.backtest import compare_models, pick_best_model, train_and_save_best
 from src.config import load_config
 from src.data_sources import fetch_intraday_yf, get_daily_history
 from src.features import build_daily_context_features, build_features, daily_seasonality, intraday_seasonality
@@ -61,8 +61,8 @@ def cmd_backtest(cfg):
               "walk_forward_splits w config.yaml.")
         return
 
-    best_name = summary.iloc[0]["model"]
-    print(f"\nNajlepszy model wg sredniego F1: {best_name}")
+    best_name = pick_best_model(summary)
+    print(f"\nNajlepszy model wg sredniego ROC AUC (baseline wykluczony z wyboru): {best_name}")
     path = train_and_save_best(feat_df, feature_cols, cfg, best_name)
     print(f"Zapisano: {path}")
     print("\nUWAGA: 'najlepszy' tu znaczy najlepszy wzgledem pozostalych "

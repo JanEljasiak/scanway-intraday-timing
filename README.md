@@ -82,7 +82,12 @@ Buduje zbior cech (dlugi kontekst dzienny + krotkie dane intraday),
 testuje kilka modeli (regresja logistyczna, KNN, SVM, Random Forest,
 Extra Trees, Gradient Boosting, opcjonalnie XGBoost) na walidacji
 chronologicznej (walk-forward - bez przeciekow z przyszlosci), wypisuje
-tabele porownawcza i zapisuje najlepszy model do `models/best_model.joblib`.
+tabele porownawcza (sortowana wg ROC AUC) i zapisuje najlepszy model do
+`models/best_model.joblib`. Wybor "najlepszego" ignoruje
+`baseline_most_frequent` i opiera sie na ROC AUC, nie na F1 - przy
+niezbalansowanych klasach (np. 77%/23%) F1 faworyzuje modele, ktore po
+prostu zawsze przewiduja klase wiekszosciowa (wysoki recall, ale ROC
+AUC=0.5, czyli zero realnej sily predykcyjnej).
 
 Przyklad outputu:
 ```
