@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 460" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<text x="430.0" y="20.0" font-size="14" text-anchor="middle" fill="#57606a" font-weight="bold">Replay sesji: gdzie model wysyla ALERT vs realne szczyty</text>
+<text x="430.0" y="36.0" font-size="9" text-anchor="middle" fill="#cf222e" font-weight="normal">sesja ILUSTRACYJNA (syntetyczna, seed=42) - pokazuje mechanizm, nie realne notowania</text>
+<text x="55.0" y="44.0" font-size="10" text-anchor="start" fill="#57606a" font-weight="bold">Cena (PLN)</text>
+<rect x="67.6" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="92.2" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="116.7" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="141.2" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="165.8" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="190.3" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="214.8" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="239.4" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="263.9" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="288.4" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="312.9" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="337.5" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="362.0" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="386.5" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="411.1" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="435.6" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="460.1" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="484.7" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="509.2" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="533.7" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="558.3" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="582.8" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="631.9" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="656.4" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="680.9" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="705.4" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<rect x="730.0" y="50" width="23.8" height="200.0" fill="#fff1e5"/>
+<polyline fill="none" stroke="#0969da" stroke-width="2" points="55.0,86.3 79.5,78.6 104.1,73.1 128.6,75.4 153.1,89.7 177.7,98.8 202.2,95.3 226.7,104.8 251.2,112.4 275.8,123.0 300.3,127.8 324.8,137.6 349.4,144.7 373.9,147.0 398.4,156.5 423.0,159.1 447.5,161.5 472.0,162.8 496.6,168.3 521.1,159.5 545.6,160.8 570.2,165.4 594.7,175.7 619.2,182.3 643.8,181.8 668.3,180.1 692.8,179.4 717.3,182.0 741.9,193.8 766.4,197.7 790.9,209.3 815.5,222.0 840.0,226.9"/>
+<circle cx="104.1" cy="73.1" r="5" fill="#cf222e"/>
+<text x="104.1" y="63.1" font-size="9" text-anchor="middle" fill="#cf222e" font-weight="bold">szczyt dnia</text>
+<polygon points="149.1,78.7 157.1,78.7 153.1,85.7" fill="#1a7f37"/>
+<polygon points="173.7,87.8 181.7,87.8 177.7,94.8" fill="#1a7f37"/>
+<polygon points="222.7,93.8 230.7,93.8 226.7,100.8" fill="#1a7f37"/>
+<polygon points="247.2,101.4 255.2,101.4 251.2,108.4" fill="#1a7f37"/>
+<polygon points="271.8,112.0 279.8,112.0 275.8,119.0" fill="#1a7f37"/>
+<polygon points="296.3,116.8 304.3,116.8 300.3,123.8" fill="#1a7f37"/>
+<polygon points="320.8,126.6 328.8,126.6 324.8,133.6" fill="#1a7f37"/>
+<polygon points="345.4,133.7 353.4,133.7 349.4,140.7" fill="#1a7f37"/>
+<polygon points="369.9,136.0 377.9,136.0 373.9,143.0" fill="#1a7f37"/>
+<polygon points="394.4,145.5 402.4,145.5 398.4,152.5" fill="#1a7f37"/>
+<polygon points="419.0,148.1 427.0,148.1 423.0,155.1" fill="#1a7f37"/>
+<polygon points="443.5,150.5 451.5,150.5 447.5,157.5" fill="#1a7f37"/>
+<polygon points="468.0,151.8 476.0,151.8 472.0,158.8" fill="#1a7f37"/>
+<polygon points="492.6,157.3 500.6,157.3 496.6,164.3" fill="#1a7f37"/>
+<polygon points="590.7,164.7 598.7,164.7 594.7,171.7" fill="#1a7f37"/>
+<polygon points="615.2,171.3 623.2,171.3 619.2,178.3" fill="#1a7f37"/>
+<polygon points="737.9,182.8 745.9,182.8 741.9,189.8" fill="#1a7f37"/>
+<polygon points="762.4,186.7 770.4,186.7 766.4,193.7" fill="#1a7f37"/>
+<polygon points="786.9,198.3 794.9,198.3 790.9,205.3" fill="#1a7f37"/>
+<polygon points="811.5,211.0 819.5,211.0 815.5,218.0" fill="#1a7f37"/>
+<polygon points="836.0,215.9 844.0,215.9 840.0,222.9" fill="#1a7f37"/>
+<text x="55.0" y="264.0" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">09:00</text>
+<text x="153.1" y="264.0" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">10:00</text>
+<text x="251.2" y="264.0" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">11:00</text>
+<text x="349.4" y="264.0" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">12:00</text>
+<text x="447.5" y="264.0" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">13:00</text>
+<text x="545.6" y="264.0" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">14:00</text>
+<text x="643.8" y="264.0" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">15:00</text>
+<text x="741.9" y="264.0" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">16:00</text>
+<text x="840.0" y="264.0" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">17:00</text>
+<text x="55.0" y="294.0" font-size="10" text-anchor="start" fill="#57606a" font-weight="bold">Prawdopodobienstwo szczytu</text>
+<line x1="55" y1="420.0" x2="840" y2="420.0" stroke="#d0d7de" stroke-width="1"/>
+<text x="49.0" y="423.0" font-size="8" text-anchor="end" fill="#57606a" font-weight="normal">0%</text>
+<line x1="55" y1="360.0" x2="840" y2="360.0" stroke="#d0d7de" stroke-width="1"/>
+<text x="49.0" y="363.0" font-size="8" text-anchor="end" fill="#57606a" font-weight="normal">50%</text>
+<line x1="55" y1="300.0" x2="840" y2="300.0" stroke="#d0d7de" stroke-width="1"/>
+<text x="49.0" y="303.0" font-size="8" text-anchor="end" fill="#57606a" font-weight="normal">100%</text>
+<line x1="55" y1="348.0" x2="840" y2="348.0" stroke="#cf222e" stroke-width="1.5" stroke-dasharray="5 3"/>
+<text x="840.0" y="344.0" font-size="9" text-anchor="end" fill="#cf222e" font-weight="normal">prog 60%</text>
+<polyline fill="none" stroke="#8250df" stroke-width="2" points="55.0,360.5 79.5,368.1 104.1,368.5 128.6,361.3 153.1,346.4 177.7,343.3 202.2,357.7 226.7,340.5 251.2,341.0 275.8,331.9 300.3,337.6 324.8,330.1 349.4,331.7 373.9,338.0 398.4,328.9 423.0,337.8 447.5,341.2 472.0,343.0 496.6,337.9 521.1,358.9 545.6,357.0 570.2,349.9 594.7,342.1 619.2,341.6 643.8,348.4 668.3,354.8 692.8,359.6 717.3,361.6 741.9,344.4 766.4,346.3 790.9,333.1 815.5,326.1 840.0,330.4"/>
+<circle cx="55.0" cy="360.5" r="2.5" fill="#afb8c1"/>
+<circle cx="79.5" cy="368.1" r="2.5" fill="#afb8c1"/>
+<circle cx="104.1" cy="368.5" r="2.5" fill="#afb8c1"/>
+<circle cx="128.6" cy="361.3" r="2.5" fill="#afb8c1"/>
+<circle cx="153.1" cy="346.4" r="2.5" fill="#1a7f37"/>
+<circle cx="177.7" cy="343.3" r="2.5" fill="#1a7f37"/>
+<circle cx="202.2" cy="357.7" r="2.5" fill="#afb8c1"/>
+<circle cx="226.7" cy="340.5" r="2.5" fill="#1a7f37"/>
+<circle cx="251.2" cy="341.0" r="2.5" fill="#1a7f37"/>
+<circle cx="275.8" cy="331.9" r="2.5" fill="#1a7f37"/>
+<circle cx="300.3" cy="337.6" r="2.5" fill="#1a7f37"/>
+<circle cx="324.8" cy="330.1" r="2.5" fill="#1a7f37"/>
+<circle cx="349.4" cy="331.7" r="2.5" fill="#1a7f37"/>
+<circle cx="373.9" cy="338.0" r="2.5" fill="#1a7f37"/>
+<circle cx="398.4" cy="328.9" r="2.5" fill="#1a7f37"/>
+<circle cx="423.0" cy="337.8" r="2.5" fill="#1a7f37"/>
+<circle cx="447.5" cy="341.2" r="2.5" fill="#1a7f37"/>
+<circle cx="472.0" cy="343.0" r="2.5" fill="#1a7f37"/>
+<circle cx="496.6" cy="337.9" r="2.5" fill="#1a7f37"/>
+<circle cx="521.1" cy="358.9" r="2.5" fill="#afb8c1"/>
+<circle cx="545.6" cy="357.0" r="2.5" fill="#afb8c1"/>
+<circle cx="570.2" cy="349.9" r="2.5" fill="#afb8c1"/>
+<circle cx="594.7" cy="342.1" r="2.5" fill="#1a7f37"/>
+<circle cx="619.2" cy="341.6" r="2.5" fill="#1a7f37"/>
+<circle cx="643.8" cy="348.4" r="2.5" fill="#afb8c1"/>
+<circle cx="668.3" cy="354.8" r="2.5" fill="#afb8c1"/>
+<circle cx="692.8" cy="359.6" r="2.5" fill="#afb8c1"/>
+<circle cx="717.3" cy="361.6" r="2.5" fill="#afb8c1"/>
+<circle cx="741.9" cy="344.4" r="2.5" fill="#1a7f37"/>
+<circle cx="766.4" cy="346.3" r="2.5" fill="#1a7f37"/>
+<circle cx="790.9" cy="333.1" r="2.5" fill="#1a7f37"/>
+<circle cx="815.5" cy="326.1" r="2.5" fill="#1a7f37"/>
+<circle cx="840.0" cy="330.4" r="2.5" fill="#1a7f37"/>
+<rect x="55" y="443" width="14" height="9" fill="#fff1e5" stroke="#bc4c00" stroke-width="0.5"/>
+<text x="73.0" y="451.0" font-size="9" text-anchor="start" fill="#57606a" font-weight="normal">realny moment sprzedazy (target=1)</text>
+<polygon points="305,443 313,443 309,450" fill="#1a7f37"/>
+<text x="319.0" y="451.0" font-size="9" text-anchor="start" fill="#57606a" font-weight="normal">alert modelu</text>
+<circle cx="415" cy="448" r="4" fill="#cf222e"/>
+<text x="425.0" y="451.0" font-size="9" text-anchor="start" fill="#57606a" font-weight="normal">szczyt dnia</text>
+</svg>

@@ -8,5 +8,6 @@ venv/
 models/*.joblib
 models/*.json
 data/*.cache.csv
+data/intraday_snapshot.csv
 
 .DS_Store

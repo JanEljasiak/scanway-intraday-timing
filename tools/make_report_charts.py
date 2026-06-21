@@ -298,6 +298,160 @@ def chart_ranking():
     save("06_ranking_auc.svg", p)
 
 
+# ----------------------------------------------------------------------------
+# 7. KOMPROMIS yfinance: interwal vs maksymalna historia (dlaczego 15m)
+# ----------------------------------------------------------------------------
+# (interwal, max dni wstecz, swiec na sesje GPW ~8h)  -- limity yfinance
+INTERVALS = [
+    ("1m", 7, 480),
+    ("5m", 60, 96),
+    ("15m", 60, 33),   # <- wybor projektu
+    ("30m", 60, 16),
+    ("1h", 730, 8),
+]
+
+
+def chart_intervals():
+    data = INTERVALS
+    W, H = 720, 320
+    ml, mr, mt, mb = 60, 60, 50, 40
+    pw, ph = W - ml - mr, H - mt - mb
+    daymax = 730
+    bw = pw / len(data) * 0.5
+
+    def Y(v): return mt + ph * (1 - v / daymax)
+
+    p = _svg_open(W, H)
+    p.append(_text(W / 2, 18, "yfinance: im drobniejszy interwal, tym krotsza historia",
+                   13, "middle", C_TEXT, "bold"))
+    p.append(_text(W / 2, 34, "15m to kompromis: ~60 dni (=~57 sesji) przy sensownej liczbie swiec/sesje",
+                   10, "middle", C_TEXT))
+    for gv in [7, 60, 365, 730]:
+        y = Y(gv)
+        p.append(f'<line x1="{ml}" y1="{y:.1f}" x2="{ml+pw}" y2="{y:.1f}" stroke="{C_GRID}" stroke-width="1" stroke-dasharray="3 3"/>')
+        p.append(_text(ml - 8, y + 4, f"{gv}d", 9, "end", C_TEXT))
+    for i, (iv, days, bars) in enumerate(data):
+        cx = ml + pw * (i + 0.5) / len(data)
+        x = cx - bw / 2
+        y = Y(days)
+        chosen = iv == "15m"
+        col = C_GREEN if chosen else C_BLUE
+        p.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{bw:.1f}" height="{Y(0)-y:.1f}" fill="{col}" rx="2"/>')
+        p.append(_text(cx, y - 6, f"{days}d", 10, "middle", C_TEXT, "bold"))
+        lab = iv + ("  (wybor)" if chosen else "")
+        p.append(_text(cx, H - 20, lab, 10, "middle",
+                       C_GREEN if chosen else C_TEXT, "bold" if chosen else "normal"))
+        p.append(_text(cx, H - 8, f"~{bars} swiec/sesje", 8, "middle", C_TEXT))
+    save("07_interwaly_yfinance.svg", p)
+
+
+# ----------------------------------------------------------------------------
+# 8. REPLAY: odtworzenie sesji - cena + alerty + ground truth (2 panele)
+# ----------------------------------------------------------------------------
+def chart_replay():
+    """Liczy replay na tej samej syntetycznej sesji co `replay --synthetic`
+    (seed=42), zeby wizualizacja w raporcie zgadzala sie z wynikiem komendy."""
+    import sys
+    sys.path.insert(0, str(ROOT))
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    from src.config import load_config
+    from src.features import build_features
+    from src.replay import make_synthetic_session, replay_session
+
+    cfg = load_config()
+    intraday = make_synthetic_session(cfg, n_sessions=40, seed=42)
+    feat_df, cols = build_features(intraday, None, cfg)
+    sessions = sorted(feat_df["date"].unique())
+    train = feat_df[feat_df["date"].isin(sessions[:-1])]
+    model = Pipeline([("scale", StandardScaler()),
+                      ("clf", LogisticRegression(max_iter=1000, class_weight="balanced"))])
+    model.fit(train[cols], train["target_local_top"])
+    rep = replay_session(intraday, None, cfg, model, cols)
+
+    n = len(rep)
+    W, H = 860, 460
+    ml, mr = 55, 20
+    # panel ceny
+    p1t, p1b = 50, 250
+    # panel proby
+    p2t, p2b = 300, 420
+    pw = W - ml - mr
+
+    prices = rep["close"].values
+    pmin, pmax = prices.min(), prices.max()
+    pad = (pmax - pmin) * 0.15 or 1
+    pmin -= pad; pmax += pad
+
+    def X(i): return ml + pw * i / (n - 1)
+    def Yp(v): return p1t + (p1b - p1t) * (1 - (v - pmin) / (pmax - pmin))
+    def Yq(v): return p2t + (p2b - p2t) * (1 - v)  # proba 0..1
+
+    p = _svg_open(W, H)
+    p.append(_text(W / 2, 20, "Replay sesji: gdzie model wysyla ALERT vs realne szczyty",
+                   14, "middle", C_TEXT, "bold"))
+    p.append(_text(W / 2, 36, "sesja ILUSTRACYJNA (syntetyczna, seed=42) - pokazuje mechanizm, nie realne notowania",
+                   9, "middle", C_RED))
+
+    # --- panel 1: cena ---
+    p.append(_text(ml, p1t - 6, "Cena (PLN)", 10, "start", C_TEXT, "bold"))
+    # pasma ground-truth (target=1) jako jasne tlo
+    for i, tg in enumerate(rep["target"].values):
+        if tg == 1:
+            x = X(i) - (pw / n / 2)
+            p.append(f'<rect x="{x:.1f}" y="{p1t}" width="{pw/n:.1f}" height="{p1b-p1t:.1f}" fill="#fff1e5"/>')
+    # linia ceny
+    pts = " ".join(f"{X(i):.1f},{Yp(v):.1f}" for i, v in enumerate(prices))
+    p.append(f'<polyline fill="none" stroke="{C_BLUE}" stroke-width="2" points="{pts}"/>')
+    # szczyt dnia
+    hi_idx = int(rep["is_session_high"].values.argmax())
+    p.append(f'<circle cx="{X(hi_idx):.1f}" cy="{Yp(prices[hi_idx]):.1f}" r="5" fill="{C_RED}"/>')
+    p.append(_text(X(hi_idx), Yp(prices[hi_idx]) - 10, "szczyt dnia", 9, "middle", C_RED, "bold"))
+    # alerty (zielone trojkaty nad cena)
+    for i, al in enumerate(rep["alert"].values):
+        if al:
+            x, y = X(i), Yp(prices[i]) - 4
+            p.append(f'<polygon points="{x-4:.1f},{y-7:.1f} {x+4:.1f},{y-7:.1f} {x:.1f},{y:.1f}" fill="{C_GREEN}"/>')
+    # os czasu (co 4 swiece)
+    for i in range(0, n, 4):
+        p.append(_text(X(i), p1b + 14, rep["time"].iloc[i], 8, "middle", C_TEXT))
+
+    # --- panel 2: prawdopodobienstwo ---
+    p.append(_text(ml, p2t - 6, "Prawdopodobienstwo szczytu", 10, "start", C_TEXT, "bold"))
+    for gv in [0.0, 0.5, 1.0]:
+        y = Yq(gv)
+        p.append(f'<line x1="{ml}" y1="{y:.1f}" x2="{ml+pw}" y2="{y:.1f}" stroke="{C_GRID}" stroke-width="1"/>')
+        p.append(_text(ml - 6, y + 3, f"{gv:.0%}", 8, "end", C_TEXT))
+    # prog alertu
+    yth = Yq(0.6)
+    p.append(f'<line x1="{ml}" y1="{yth:.1f}" x2="{ml+pw}" y2="{yth:.1f}" stroke="{C_RED}" stroke-width="1.5" stroke-dasharray="5 3"/>')
+    p.append(_text(ml + pw, yth - 4, "prog 60%", 9, "end", C_RED))
+    qpts = " ".join(f"{X(i):.1f},{Yq(v):.1f}" for i, v in enumerate(rep["proba"].values))
+    p.append(f'<polyline fill="none" stroke="{C_PURPLE}" stroke-width="2" points="{qpts}"/>')
+    for i, v in enumerate(rep["proba"].values):
+        col = C_GREEN if rep["alert"].iloc[i] else C_GRAY
+        p.append(f'<circle cx="{X(i):.1f}" cy="{Yq(v):.1f}" r="2.5" fill="{col}"/>')
+
+    # legenda
+    ly = H - 8
+    p.append(f'<rect x="{ml}" y="{ly-9}" width="14" height="9" fill="#fff1e5" stroke="{C_ORANGE}" stroke-width="0.5"/>')
+    p.append(_text(ml + 18, ly - 1, "realny moment sprzedazy (target=1)", 9, "start", C_TEXT))
+    p.append(f'<polygon points="{ml+250},{ly-9} {ml+258},{ly-9} {ml+254},{ly-2}" fill="{C_GREEN}"/>')
+    p.append(_text(ml + 264, ly - 1, "alert modelu", 9, "start", C_TEXT))
+    p.append(f'<circle cx="{ml+360}" cy="{ly-4}" r="4" fill="{C_RED}"/>')
+    p.append(_text(ml + 370, ly - 1, "szczyt dnia", 9, "start", C_TEXT))
+    save("08_replay_sesja.svg", p)
+
+    # zwroc statystyki sesji do raportu
+    n_alert = int(rep["alert"].sum())
+    n_target = int(rep["target"].sum())
+    hits = int(((rep["alert"]) & (rep["target"] == 1)).sum())
+    print(f"  [replay] alerty={n_alert} target={n_target} trafione={hits} "
+          f"high@{rep['time'].iloc[hi_idx]}")
+
+
 if __name__ == "__main__":
     print("Generuje wykresy SVG do docs/assets/ ...")
     chart_price()
@@ -306,4 +460,6 @@ if __name__ == "__main__":
     chart_balance()
     chart_models()
     chart_ranking()
+    chart_intervals()
+    chart_replay()
     print("Gotowe.")

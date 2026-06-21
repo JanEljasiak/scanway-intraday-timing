@@ -105,7 +105,20 @@ Jesli "prawdziwe" modele ledwo biją `baseline_most_frequent`, to sygnal,
 ze rynek dla SCW w tym okresie jest bliski losowemu (co dla malej spolki
 nie jest niespodzianka).
 
-### 3. Uruchom alert live
+### 3. Odtworz jedna sesje swieca-po-swiecy (replay)
+
+```bash
+py main.py replay              # ostatnia realna sesja (wymaga modelu + internetu)
+py main.py replay --synthetic  # sesja ilustracyjna, dziala offline (bez internetu)
+```
+
+Pokazuje, dla kazdej 15-min swiecy, prawdopodobienstwo "lokalnego szczytu"
+liczone przez model, i porownuje alerty z faktycznymi momentami sprzedazy
+(ground truth) oraz rzeczywistym szczytem dnia. To najlepszy sposob, zeby
+ZOBACZYC jak narzedzie dziala w praktyce. Pelne omowienie z wykresem:
+[docs/RAPORT_ANALIZA.md](docs/RAPORT_ANALIZA.md) (sekcja 5).
+
+### 4. Uruchom alert live
 
 ```bash
 py main.py live

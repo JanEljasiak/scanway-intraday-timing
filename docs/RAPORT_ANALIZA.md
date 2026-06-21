@@ -6,7 +6,9 @@
 > sprzedaż.
 >
 > Ten dokument podsumowuje wizualnie: (1) eksplorację danych (EDA),
-> (2) inżynierię cech, (3) proces wyboru modelu i (4) porównanie kandydatów.
+> (2) inżynierię cech, (3) co dokładnie jest testowane (interwał/target),
+> (4) proces wyboru modelu i porównanie kandydatów oraz (5) demonstrację
+> działania na pojedynczej sesji (`replay`).
 > Wykresy są generowane skryptem [`tools/make_report_charts.py`](../tools/make_report_charts.py)
 > z prawdziwych danych — odtworzysz je komendą `py tools/make_report_charts.py`.
 
@@ -57,6 +59,63 @@ w całym zbiorze: dla tej spółki bardzo często "szczyt jest na otwarciu".
 Cecha `minute_of_day` powinna więc być jedną z najważniejszych w modelu.
 
 > 🔧 **Pułapka inżynieryjna powiązana z tym sygnałem** — patrz §2.3.
+
+---
+
+## 1.5 Co dokładnie jest testowane (interwał, okno, target)
+
+Ta sekcja odpowiada wprost na pytanie: *„15-min interwał — czy to maksimum?
+co dokładnie ląduje w modelu?”*
+
+### Interwał 15 min to wybór, nie ograniczenie sprzętowe
+
+![Interwały yfinance](assets/07_interwaly_yfinance.svg)
+
+yfinance (darmowe źródło) narzuca **twardy kompromis: im drobniejszy interwał,
+tym krótsza dostępna historia.** Najdrobniejszy `1m` sięga zaledwie ~7 dni
+wstecz — za mało, by model cokolwiek się nauczył. `15m` daje ~60 dni
+(=~57 sesji) przy 33 świecach na sesję — to świadomie wybrany punkt równowagi
+(`config.yaml`: `intraday_interval: "15m"`, `intraday_period: "60d"`).
+
+| Interwał | Max historia | Świec/sesja | Werdykt |
+|---|---|---|---|
+| 1m | ~7 dni | ~480 | za krótka historia do treningu |
+| 5m | ~60 dni | ~96 | możliwe, więcej szumu |
+| **15m** | **~60 dni** | **~33** | **wybór: balans danych i szumu** |
+| 30m | ~60 dni | ~16 | za grubo na timing śróddzienny |
+| 1h | ~730 dni | ~8 | długa historia, ale za mało punktów w dniu |
+
+> **Wniosek:** 15 min nie jest „maksymalną dokładnością” — jest najlepszym
+> kompromisem dla *darmowego* źródła. Drobniejszy interwał z sensowną historią
+> wymaga płatnego źródła (patrz sekcja o danych na końcu).
+
+### Co dokładnie jest etykietą (target `target_local_top`)
+
+Dla **każdej** 15-min świecy model uczy się odpowiadać na pytanie:
+*„czy w ciągu najbliższej godziny (4 świece) cena spadnie o ≥0.5% od obecnej?”*
+
+Formalnie (`src/features.py`):
+
+```
+fut_min(t) = min( Low[t+1], Low[t+2], Low[t+3], Low[t+4] )      # następne 4 świece
+target(t)  = 1  jeśli  (Close[t] - fut_min(t)) / Close[t] > 0.5%
+             0  w przeciwnym razie
+```
+
+Czyli `target=1` znaczy „**TERAZ był dobry moment na sprzedaż**, bo zaraz
+będzie taniej o co najmniej 0.5%”. Parametry pochodzą z `config.yaml`
+(`sell_horizon_bars: 4`, `sell_target_drop_pct: 0.5`) — możesz je zmienić bez
+ruszania kodu.
+
+### Co jest, a czego NIE ma w teście
+
+| Element | Status |
+|---|---|
+| Walidacja | walk-forward, podział **po dacie sesji**, `n_splits=6` |
+| Przeciek z przyszłości | zabezpieczony (`.shift(1)` na cechach dziennych) |
+| Liczność | 1847 świec / **57 sesji** (mało — główne ograniczenie) |
+| Koszty transakcyjne / poślizg | **nie uwzględnione** |
+| Opóźnienie danych live (~15 min) | **nie symulowane w backteście** (jest realne na żywo) |
 
 ---
 
@@ -169,7 +228,57 @@ małej, mocno zmiennej spółki to nie jest niespodzianka. Praktyczny wniosek:
 
 ---
 
-## 5. Następne kroki (rekomendacje)
+## 5. Demonstracja w praktyce — `replay` jednej sesji
+
+Backtest (§3–4) mówi *jak dobry jest model statystycznie*, ale nie pokazuje,
+**jak to wygląda w ciągu jednego dnia**. Do tego służy nowa komenda:
+
+```bash
+py main.py replay              # ostatnia realna sesja (wymaga modelu + internetu)
+py main.py replay --synthetic  # sesja ilustracyjna, działa offline
+```
+
+Przechodzi ona sesję **świeca po świecy** i dla każdej 15-min świecy liczy
+prawdopodobieństwo szczytu, porównując alerty modelu z faktycznymi momentami
+sprzedaży (ground truth) i rzeczywistym szczytem dnia.
+
+![Replay sesji](assets/08_replay_sesja.svg)
+
+> Wykres pochodzi z sesji **ilustracyjnej** (`--synthetic`, seed=42) — pokazuje
+> *mechanizm*, nie prawdziwe notowania (środowisko bez internetu). Na Twoim
+> komputerze `py main.py replay` wygeneruje to samo z realnych danych.
+
+### Jak to czytać
+
+- **Niebieska linia (góra):** cena w trakcie sesji.
+- **Czerwona kropka:** rzeczywisty szczyt dnia (tu: **09:30** — zgodnie z
+  obserwacją z §1.4, że szczyt często wypada rano).
+- **Pomarańczowe pasma:** świece, w których *faktycznie* opłacało się sprzedać
+  (`target=1`).
+- **Zielone trójkąty / fioletowa linia (dół):** alert modelu, gdy
+  prawdopodobieństwo przekracza próg 60% (czerwona linia przerywana).
+
+### Co ta sesja pokazuje (i czego uczy)
+
+Na tej ilustracji: **21 alertów, 27 realnych momentów sprzedaży, 16 trafień →
+precyzja sesji 76%, pokrycie 59%.** Najważniejsza obserwacja jest jednak
+jakościowa:
+
+- Model **łapie okno spadkowe** po porannym szczycie — alerty zapalają się w
+  fazie zniżki, czyli mniej więcej tam, gdzie trzeba.
+- Ale **alerty startują ~30 min po faktycznym szczycie (09:30 → pierwszy alert
+  10:00)** — to nie błąd, lecz nieunikniona konsekwencja tego, że model widzi
+  świecę dopiero po jej zamknięciu, a dane live mają ~15 min opóźnienia.
+  To wizualnie potwierdza ostrzeżenie z `src/alert.py`: realne opóźnienie
+  reakcji może sięgać ~30 min.
+
+> **Praktyczny wniosek:** narzędzie wskazuje *fazę* „po szczycie, czas
+> rozważyć sprzedaż”, a nie chirurgiczny punkt maksimum. Dla wczesnego
+> wyjścia warto łączyć je z prostą regułą z EDA (szczyt często ~09:00–09:30).
+
+---
+
+## 6. Następne kroki (rekomendacje)
 
 1. **Naprawić `vol_zscore`** (§2.3), żeby nie kasować świecy 09:00 z treningu.
 2. **Lepsze kodowanie dnia tygodnia** — zamiast liniowego `dow_num` użyć
