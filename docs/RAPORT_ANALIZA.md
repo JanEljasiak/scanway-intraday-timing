@@ -8,8 +8,9 @@
 > Ten dokument podsumowuje wizualnie: (1) eksplorację danych (EDA),
 > (2) inżynierię cech, (3) co dokładnie jest testowane (interwał/target),
 > (4) proces wyboru modelu i porównanie kandydatów, (5) demonstrację
-> działania na pojedynczej sesji (`replay`) oraz (6) ocenę dzień-po-dniu z
-> dowodem, że model bije losowy (`evaluate`).
+> działania na pojedynczej sesji (`replay`), (6) ocenę dzień-po-dniu z
+> dowodem, że model bije losowy (`evaluate`) oraz (7) tryb `peak` —
+> jeden sygnał dziennie celujący w dzienne maksimum.
 > Wykresy są generowane skryptem [`tools/make_report_charts.py`](../tools/make_report_charts.py)
 > z prawdziwych danych — odtworzysz je komendą `py tools/make_report_charts.py`.
 
@@ -438,7 +439,87 @@ wypisze analogiczne dla modelu produkcyjnego (trenowanego na całości).
 
 ---
 
-## 7. Następne kroki (rekomendacje)
+## 7. Tryb `peak` — jeden sygnał = DZIENNE MAKSIMUM
+
+Sekcje 1–6 dotyczą modelu „lokalnego szczytu” (`target_local_top`): dla każdej
+świecy pyta „czy zaraz spadnie o ≥0.5%”, więc w ciągu dnia zapala się
+**wielokrotnie**. To dobre do analizy, ale nie do realnej decyzji „sprzedaj
+raz, na górce”. Dlatego dołożyłem osobny tryb:
+
+```bash
+py main.py peak                # realne dane, jeden sygnał dziennie
+py main.py peak --synthetic    # offline
+```
+
+### Co się zmieniło względem poprzedniego modelu
+
+| | tryb `local_top` (§1–6) | **tryb `peak` (ten)** |
+|---|---|---|
+| Target | każda świeca przed spadkiem ≥0.5% | **1 świeca/dzień = najwyższy Close** |
+| Sygnałów dziennie | wiele | **max 1** (świeca o najwyższym prawd.) lub brak |
+| Funkcja straty | symetryczna (`balanced`) | **asymetryczna** — przegapienie szczytu karane `daily_high_fn_penalty`× mocniej |
+| Brak alertu | — | dozwolony, ale karany (trzymasz do zamknięcia) |
+
+### Funkcja straty: większa kara za przegapienie szczytu
+
+Zgodnie z Twoją prośbą, błąd „przegapiłem szczyt” (false negative) kosztuje
+model **wielokrotnie więcej** niż fałszywy alarm. Realizujemy to przez wagi
+klas w regresji logistycznej: `class_weight = {0: 1, 1: penalty}`. Im wyższa
+`penalty` (w `config.yaml`: `daily_high_fn_penalty`), tym agresywniej model
+szuka szczytu. Widać to wprost:
+
+![Wpływ kary](assets/16_peak_kara.svg)
+
+- **kara = 1** (symetryczna): model jest tchórzliwy — **nie alarmuje wcale**,
+  regret = 3.58% (tyle tracisz trzymając do zamknięcia).
+- **kara = 12** (domyślna): alarmuje w 9/11 dni, regret spada do **1.72%**.
+- **kara = 30**: alarmuje codziennie, trafia 45% dni, regret **1.24%**.
+
+To jest dokładnie efekt, o który prosiłeś: mocniejsza kara za przegapienie →
+model częściej i celniej łapie szczyt. `daily_high_fn_penalty` w `config.yaml`
+stroisz sam.
+
+### Najważniejszy wykres dla laika: jak blisko górki sprzedajesz
+
+![Regret peak](assets/14_peak_regret.svg)
+
+„Regret” = o ile procent **poniżej** dziennego maksimum sprzedałeś. To liczba,
+która realnie Cię interesuje. Na sesjach testowych (out-of-sample, realne dane):
+
+| Strategia | Średnio poniżej szczytu |
+|---|---|
+| **MODEL (peak)** | **1.72%** |
+| sprzedaż na otwarciu 09:00 | 2.32% |
+| sprzedaż w losowym momencie | 2.78% |
+| trzymanie do zamknięcia | 3.58% |
+| idealnie (sufit) | 0.00% |
+
+Model sprzedaje **bliżej górki niż każda prosta strategia** — w tym niż reguła
+„sprzedaj na otwarciu” (która z EDA wydawała się mocna).
+
+### Gdzie był szczyt, a gdzie alert (każdy dzień)
+
+![Timeline peak](assets/15_peak_timeline.svg)
+
+Czerwona kropka = faktyczny szczyt, zielony trójkąt = alert modelu. W kilku
+dniach trafia idealnie (lag 0), w innych alarmuje za wcześnie (rano) — co jest
+zgodne z naturą danych (szczyt bywa rano) i z ~15-min opóźnieniem live.
+
+### Czy to wiarygodne? (test permutacyjny)
+
+Tasujemy 1000× przypisanie prawdopodobieństw do świec w obrębie dnia (model
+traci wiedzę, gdzie jest szczyt) i liczymy regret. Wynik: średni regret modelu
+**1.72%** vs **3.06%** przy losowym wyborze, **p-value = 0.003** — model
+wybiera moment sprzedaży istotnie lepiej niż przypadek.
+
+> **Uczciwie:** trafień „co do świecy” (±1) jest ~36% — model nie wskazuje
+> górki z chirurgiczną precyzją. Ale *cenowo* jesteś średnio bardzo blisko
+> szczytu (1.7% poniżej), bo wokół maksimum cena jest płaska. To realnie
+> użyteczne jako „sprzedaj teraz”, mimo że dokładna świeca bywa chybiona.
+
+---
+
+## 8. Następne kroki (rekomendacje)
 
 1. **Naprawić `vol_zscore`** (§2.3), żeby nie kasować świecy 09:00 z treningu.
 2. **Lepsze kodowanie dnia tygodnia** — zamiast liniowego `dow_num` użyć

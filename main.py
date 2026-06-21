@@ -199,6 +199,57 @@ def cmd_evaluate(cfg, synthetic=False, train_frac=0.8, model_name=None):
           "`backtest` (walk-forward na wielu oknach).")
 
 
+def cmd_peak(cfg, synthetic=False, train_frac=0.8):
+    """Tryb peak: jeden sygnal dziennie = dzienne maksimum, z asymetryczna kara."""
+    from src.peak import daily_peak_evaluation, penalty_sweep
+
+    print("Wczytuje dane do trybu PEAK (jeden szczyt dziennie)...")
+    intraday, source = load_intraday_for_replay(cfg, synthetic=synthetic)
+    print(f"Zrodlo danych: {source}")
+    daily_ctx = None
+    if not synthetic:
+        daily = get_daily_history(cfg, refresh_live=True)
+        daily_ctx = build_daily_context_features(daily)
+
+    feat_df, feature_cols = build_features(intraday, daily_ctx, cfg)
+    per_day, summary, _ = daily_peak_evaluation(feat_df, feature_cols, cfg, train_frac=train_frac)
+
+    print(f"\nTarget: dzienne maksimum (1 swieca/sesje) | kara za przegapienie (FN): "
+          f"{summary['penalty']}x | split {int(train_frac*100)}/{100-int(train_frac*100)}")
+    print(f"Sesje treningowe: {summary['n_train_sessions']} | testowe: {summary['n_test_sessions']}")
+
+    print("\n=== Kazdy dzien testowy: gdzie byl szczyt vs gdzie alert ===")
+    view = per_day.copy()
+    view["lag_bars"] = view["lag_bars"].map(lambda v: f"{int(v):+d}" if pd.notna(v) else "-")
+    view["trafiony"] = view["trafiony"].map({True: "TAK", False: "nie"})
+    for c in ("regret_model", "regret_open", "regret_random"):
+        view[c] = view[c].map(lambda v: f"{v:.2f}%")
+    print(view.to_string(index=False))
+
+    print("\n=== Jak blisko dziennego szczytu sprzedajesz? (sredni regret = % ponizej maksimum) ===")
+    print(f"  MODEL (peak):        {summary['mean_regret_model']:.2f}%   <- nasz")
+    print(f"  sprzedaz na otwarciu:{summary['mean_regret_open']:.2f}%")
+    print(f"  sprzedaz losowa:     {summary['mean_regret_random']:.2f}%")
+    print(f"  trzymanie do konca:  {summary['mean_regret_close']:.2f}%")
+    print(f"  idealnie (sufit):    0.00%")
+    print(f"\nTrafienia w +/-{summary['tolerance_bars']} swiec od szczytu: "
+          f"{summary['hit_rate']:.0%} dni | alert odpalil w {summary['days_fired']}/"
+          f"{summary['n_test_sessions']} dni")
+
+    print("\n=== Czy to wiarygodne? (test permutacyjny) ===")
+    print(f"Sredni regret modelu: {summary['mean_regret_model']:.2f}%")
+    print(f"Sredni regret 1000 LOSOWYCH wyborow swiecy: {summary['perm_null_mean']:.2f}%")
+    print(f"p-value (szansa, ze losowy wybor jest nie gorszy): {summary['p_value']:.4f}")
+
+    print("\n=== Wplyw asymetrycznej kary (funkcji straty) na lapanie szczytu ===")
+    sweep = penalty_sweep(feat_df, feature_cols, cfg, train_frac=train_frac)
+    print(sweep.to_string(index=False, formatters={
+        "trafione_%": "{:.0f}%".format, "sredni_regret_%": "{:.2f}%".format}))
+
+    print("\nUWAGA: ocena out-of-sample na realnych danych, ale male N - traktuj "
+          "jako orientacje, nie gwarancje. Sprzedaz live ma tez ~15 min opoznienie.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="SCW - intraday timing toolkit")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -212,6 +263,11 @@ def main():
     p_eval.add_argument("--synthetic", action="store_true",
                         help="Uzyj danych syntetycznych (ilustracja, bez internetu)")
     p_eval.add_argument("--train-frac", type=float, default=0.8,
+                        help="Udzial sesji treningowych (chronologicznie). Domyslnie 0.8")
+    p_peak = sub.add_parser("peak", help="Tryb 'jeden szczyt dziennie' z asymetryczna kara")
+    p_peak.add_argument("--synthetic", action="store_true",
+                        help="Uzyj danych syntetycznych (ilustracja, bez internetu)")
+    p_peak.add_argument("--train-frac", type=float, default=0.8,
                         help="Udzial sesji treningowych (chronologicznie). Domyslnie 0.8")
 
     args = parser.parse_args()
@@ -227,6 +283,8 @@ def main():
         cmd_replay(cfg, synthetic=args.synthetic)
     elif args.command == "evaluate":
         cmd_evaluate(cfg, synthetic=args.synthetic, train_frac=args.train_frac)
+    elif args.command == "peak":
+        cmd_peak(cfg, synthetic=args.synthetic, train_frac=args.train_frac)
 
 
 if __name__ == "__main__":

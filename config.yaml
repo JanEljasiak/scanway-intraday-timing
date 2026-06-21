@@ -9,10 +9,19 @@ local_daily_csv: "data/scw_d.csv"          # lokalny cache/seed danych dziennych
 intraday_interval: "15m"                   # rozdzielczosc danych live (yfinance)
 intraday_period: "60d"                     # max okno dla 15m w yfinance
 
-# definicja "dobrego momentu sprzedazy" uzywana do treningu modelu:
+# definicja "dobrego momentu sprzedazy" uzywana do treningu modelu (tryb local_top):
 sell_horizon_bars: 4                       # 4 x 15min = patrzymy godzine w przod
 sell_target_drop_pct: 0.5                  # jesli w tym horyzoncie cena spadnie
                                             # o ten % od biezacej - "tu warto bylo sprzedac"
+
+# tryb 'peak' (komenda `py main.py peak`): jeden sygnal dziennie = DZIENNE MAKSIMUM.
+# target = swieca z najwyzszym Close w danej sesji (dokladnie 1 na dzien).
+daily_high_fn_penalty: 12.0                # asymetryczna kara: ile razy mocniej karzemy
+                                            # PRZEGAPIENIE szczytu (false negative) niz
+                                            # falszywy alarm. Wieksza = model agresywniej
+                                            # szuka szczytu (mniej przegapien).
+peak_tolerance_bars: 1                      # alert liczymy jako trafiony, jesli wypadl w
+                                            # +/- tyle swiec od faktycznego szczytu
 
 walk_forward_splits: 6                     # liczba okien w walidacji chronologicznej
 

@@ -136,7 +136,22 @@ dowod, czy wynik jest lepszy niz losowy. Wypisuje tez jawna **formule**
 regresji logistycznej (wagi cech). Omowienie: sekcja 6 w
 [docs/RAPORT_ANALIZA.md](docs/RAPORT_ANALIZA.md).
 
-### 5. Uruchom alert live
+### 5. Tryb peak - jeden sygnal dziennie = dzienne maksimum
+
+```bash
+py main.py peak                 # realne dane, jeden sygnal dziennie
+py main.py peak --synthetic     # offline
+```
+
+W przeciwienstwie do `backtest`/`evaluate` (wiele lokalnych sygnalow), tryb
+`peak` celuje w DZIENNE MAKSIMUM: target to 1 swieca/sesje (najwyzszy Close),
+a model ma ASYMETRYCZNA kare - przegapienie szczytu (false negative) karane
+`daily_high_fn_penalty`x mocniej niz falszywy alarm (`config.yaml`). Decyzja:
+max 1 alert dziennie. Pokazuje, jak blisko dziennego szczytu sprzedajesz
+(regret %) vs proste strategie, z testem permutacyjnym. Omowienie: sekcja 7 w
+[docs/RAPORT_ANALIZA.md](docs/RAPORT_ANALIZA.md).
+
+### 6. Uruchom alert live
 
 ```bash
 py main.py live

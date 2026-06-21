@@ -707,6 +707,155 @@ def chart_formula():
     save("13_formula.svg", p)
 
 
+def _compute_peak():
+    """Liczy ocene trybu peak na realnych (lub awaryjnie syntetycznych) danych,
+    tak jak komenda `peak`. Zwraca (per_day, summary, sweep, is_real)."""
+    from src.features import build_features
+    from src.peak import daily_peak_evaluation, penalty_sweep
+
+    intraday, daily_ctx, cfg, is_real, _ = _load_real_or_synthetic()
+    feat_df, cols = build_features(intraday, daily_ctx, cfg)
+    per_day, summary, _ = daily_peak_evaluation(feat_df, cols, cfg, train_frac=0.8)
+    sweep = penalty_sweep(feat_df, cols, cfg, train_frac=0.8)
+    return per_day, summary, sweep, is_real
+
+
+# ----------------------------------------------------------------------------
+# 14. PEAK - jak blisko szczytu sprzedajesz (regret vs strategie odniesienia)
+# ----------------------------------------------------------------------------
+def chart_peak_regret():
+    _, summary, _, is_real = _compute_peak()
+    data = [
+        ("MODEL (peak)", summary["mean_regret_model"], C_GREEN),
+        ("otwarcie 09:00", summary["mean_regret_open"], C_GRAY),
+        ("losowo", summary["mean_regret_random"], C_GRAY),
+        ("do zamkniecia", summary["mean_regret_close"], C_GRAY),
+        ("idealnie", 0.0, C_BLUE),
+    ]
+    W, H = 720, 340
+    ml, mr, mt, mb = 150, 60, 56, 30
+    pw, ph = W - ml - mr, H - mt - mb
+    rowh = ph / len(data)
+    barh = rowh * 0.55
+    vmax = max(v for _, v, _ in data) * 1.25 or 1
+
+    def X(v): return ml + pw * v / vmax
+
+    p = _svg_open(W, H)
+    p.append(_text(W / 2, 20, "Jak blisko dziennego szczytu sprzedajesz? (mniej = lepiej)",
+                   13, "middle", C_TEXT, "bold"))
+    p.append(_text(W / 2, 38, "regret = sredni % PONIZEJ dziennego maksimum; "
+                   f"p-value vs losowy = {summary['p_value']:.4f}",
+                   9, "middle", C_GREEN if summary["p_value"] < 0.05 else C_TEXT))
+    for i, (lab, v, col) in enumerate(data):
+        cy = mt + rowh * (i + 0.5)
+        best = i == 0
+        p.append(_text(ml - 8, cy + 3, lab, 10, "end",
+                       C_GREEN if best else C_TEXT, "bold" if best else "normal"))
+        p.append(f'<rect x="{ml}" y="{cy-barh/2:.1f}" width="{max(X(v)-ml,1):.1f}" height="{barh:.1f}" fill="{col}" rx="2"/>')
+        p.append(_text(X(v) + 6, cy + 3, f"{v:.2f}%", 10, "start", C_TEXT, "bold" if best else "normal"))
+    src = "realne dane" if is_real else "dane syntetyczne (ilustracja)"
+    p.append(_text(W / 2, H - 8, f"sredni regret na sesjach testowych ({src})", 9, "middle", C_TEXT))
+    save("14_peak_regret.svg", p)
+
+
+# ----------------------------------------------------------------------------
+# 15. PEAK - os czasu: gdzie byl szczyt vs gdzie alert (kazdy dzien testowy)
+# ----------------------------------------------------------------------------
+def chart_peak_timeline():
+    per_day, summary, _, is_real = _compute_peak()
+    W, H = 720, 360
+    ml, mr, mt, mb = 90, 20, 56, 40
+    pw, ph = W - ml - mr, H - mt - mb
+    rows = len(per_day)
+    rowh = ph / rows
+    # os czasu 09:00 - 17:00 w minutach
+    t0, t1 = 9 * 60, 17 * 60
+
+    def to_min(s):
+        h, m = s.split(":")
+        return int(h) * 60 + int(m)
+    def X(mins): return ml + pw * (mins - t0) / (t1 - t0)
+
+    p = _svg_open(W, H)
+    p.append(_text(W / 2, 20, "Tryb peak: faktyczny szczyt vs alert modelu (kazdy dzien)",
+                   13, "middle", C_TEXT, "bold"))
+    p.append(_text(W / 2, 38, f"trafienia w +/-{summary['tolerance_bars']} swiec: "
+                   f"{summary['hit_rate']:.0%} dni | alert odpalil w "
+                   f"{summary['days_fired']}/{summary['n_test_sessions']} dni",
+                   9, "middle", C_TEXT))
+    # siatka godzin
+    for hh in range(9, 18):
+        x = X(hh * 60)
+        p.append(f'<line x1="{x:.1f}" y1="{mt}" x2="{x:.1f}" y2="{mt+ph}" stroke="{C_GRID}" stroke-width="0.7"/>')
+        p.append(_text(x, mt + ph + 14, f"{hh}:00", 8, "middle", C_TEXT))
+    for i, r in per_day.reset_index(drop=True).iterrows():
+        cy = mt + rowh * (i + 0.5)
+        p.append(_text(ml - 8, cy + 3, str(r["date"])[5:], 9, "end", C_TEXT))
+        # faktyczny szczyt (czerwony)
+        xs = X(to_min(r["szczyt_o"]))
+        # linia laczaca alert-szczyt
+        if r["alert_o"] != "(brak)":
+            xa = X(to_min(r["alert_o"]))
+            hit = r["trafiony"]
+            lc = C_GREEN if hit else C_ORANGE
+            p.append(f'<line x1="{xs:.1f}" y1="{cy:.1f}" x2="{xa:.1f}" y2="{cy:.1f}" stroke="{lc}" stroke-width="1.5"/>')
+            p.append(f'<polygon points="{xa-4:.1f},{cy-6:.1f} {xa+4:.1f},{cy-6:.1f} {xa:.1f},{cy+1:.1f}" fill="{C_GREEN}"/>')
+        else:
+            p.append(_text(X(t1) + 0, cy + 3, "brak alertu", 8, "start", C_RED))
+        p.append(f'<circle cx="{xs:.1f}" cy="{cy:.1f}" r="4" fill="{C_RED}"/>')
+    # legenda
+    ly = 50
+    p.append(f'<circle cx="{ml+250}" cy="{ly-4}" r="4" fill="{C_RED}"/>')
+    p.append(_text(ml + 260, ly - 1, "szczyt", 9, "start", C_TEXT))
+    p.append(f'<polygon points="{ml+320},{ly-8} {ml+328},{ly-8} {ml+324},{ly-1}" fill="{C_GREEN}"/>')
+    p.append(_text(ml + 334, ly - 1, "alert", 9, "start", C_TEXT))
+    save("15_peak_timeline.svg", p)
+
+
+# ----------------------------------------------------------------------------
+# 16. PEAK - wplyw asymetrycznej kary (funkcji straty) na lapanie szczytu
+# ----------------------------------------------------------------------------
+def chart_peak_penalty():
+    _, _, sweep, is_real = _compute_peak()
+    pens = [str(x) for x in sweep["kara_FN"].tolist()]
+    hits = sweep["trafione_%"].tolist()
+    regrets = sweep["sredni_regret_%"].tolist()
+
+    W, H = 720, 340
+    ml, mr, mt, mb = 55, 55, 56, 45
+    pw, ph = W - ml - mr, H - mt - mb
+    n = len(pens)
+    bw = pw / n * 0.45
+    hmax = max(max(hits), 50)
+    rmax = max(max(regrets), 4)
+
+    def Xc(i): return ml + pw * (i + 0.5) / n
+    def Yh(v): return mt + ph * (1 - v / hmax)
+    def Yr(v): return mt + ph * (1 - v / rmax)
+
+    p = _svg_open(W, H)
+    p.append(_text(W / 2, 20, "Asymetryczna kara: mocniej karzesz przegapienie -> lepiej lapiesz szczyt",
+                   12, "middle", C_TEXT, "bold"))
+    p.append(_text(W / 2, 38, "slupki = % trafionych dni (wiecej lepiej); linia = sredni regret (mniej lepiej)",
+                   9, "middle", C_TEXT))
+    for i, h in enumerate(hits):
+        x = Xc(i) - bw / 2
+        p.append(f'<rect x="{x:.1f}" y="{Yh(h):.1f}" width="{bw:.1f}" height="{Yh(0)-Yh(h):.1f}" fill="{C_GREEN}" rx="2"/>')
+        p.append(_text(Xc(i), Yh(h) - 5, f"{h:.0f}%", 9, "middle", C_TEXT, "bold"))
+        p.append(_text(Xc(i), Yh(0) + 14, f"kara {pens[i]}", 9, "middle", C_TEXT))
+    # linia regret (skala prawa)
+    rpts = " ".join(f"{Xc(i):.1f},{Yr(v):.1f}" for i, v in enumerate(regrets))
+    p.append(f'<polyline fill="none" stroke="{C_RED}" stroke-width="2" points="{rpts}"/>')
+    for i, v in enumerate(regrets):
+        p.append(f'<circle cx="{Xc(i):.1f}" cy="{Yr(v):.1f}" r="3" fill="{C_RED}"/>')
+        p.append(_text(Xc(i), Yr(v) - 8, f"{v:.1f}%", 8, "middle", C_RED))
+    p.append(_text(ml - 6, mt + 4, "trafione", 9, "end", C_GREEN))
+    p.append(_text(ml + pw + 6, mt + 4, "regret", 9, "start", C_RED))
+    p.append(_text(W / 2, H - 8, "kara za przegapienie szczytu (false negative)", 9, "middle", C_TEXT))
+    save("16_peak_kara.svg", p)
+
+
 if __name__ == "__main__":
     print("Generuje wykresy SVG do docs/assets/ ...")
     chart_price()
@@ -722,4 +871,7 @@ if __name__ == "__main__":
     chart_daywise_auc()
     chart_permutation()
     chart_formula()
+    chart_peak_regret()
+    chart_peak_timeline()
+    chart_peak_penalty()
     print("Gotowe.")

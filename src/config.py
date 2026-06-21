@@ -22,6 +22,8 @@ class Config:
     intraday_period: str
     sell_horizon_bars: int
     sell_target_drop_pct: float
+    daily_high_fn_penalty: float
+    peak_tolerance_bars: int
     walk_forward_splits: int
     alert_probability_threshold: float
     poll_seconds: int
@@ -59,6 +61,8 @@ def load_config(path: str | Path = None) -> Config:
         intraday_period=raw["intraday_period"],
         sell_horizon_bars=int(raw["sell_horizon_bars"]),
         sell_target_drop_pct=float(raw["sell_target_drop_pct"]),
+        daily_high_fn_penalty=float(raw.get("daily_high_fn_penalty", 12.0)),
+        peak_tolerance_bars=int(raw.get("peak_tolerance_bars", 1)),
         walk_forward_splits=int(raw["walk_forward_splits"]),
         alert_probability_threshold=float(raw["alert_probability_threshold"]),
         poll_seconds=int(raw["poll_seconds"]),
