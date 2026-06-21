@@ -545,6 +545,148 @@ def chart_roc_curve():
     save("10_roc_krzywa.svg", p)
 
 
+def _compute_evaluation():
+    """Liczy ocene dzien-po-dniu na tych samych danych co `evaluate --synthetic`
+    (seed=42, split 80/20), zeby wykresy zgadzaly sie z wynikiem komendy."""
+    import sys
+    sys.path.insert(0, str(ROOT))
+    from src.config import load_config
+    from src.evaluate import daywise_evaluation, logistic_formula
+    from src.features import build_features
+    from src.replay import make_synthetic_session
+
+    cfg = load_config()
+    intraday = make_synthetic_session(cfg, n_sessions=40, seed=42)
+    feat_df, cols = build_features(intraday, None, cfg)
+    per_day, pooled, model = daywise_evaluation(feat_df, cols, cfg, "logistic_regression", 0.8)
+    fml = logistic_formula(model, cols)
+    return per_day, pooled, fml
+
+
+# ----------------------------------------------------------------------------
+# 11. OCENA DZIEN-PO-DNIU: ROC AUC kazdego dnia testowego vs linia 0.5
+# ----------------------------------------------------------------------------
+def chart_daywise_auc():
+    per_day, pooled, _ = _compute_evaluation()
+    aucs = per_day["auc"].fillna(0.5).tolist()
+    labels = [str(d)[5:] for d in per_day["date"]]  # MM-DD
+
+    W, H = 720, 340
+    ml, mr, mt, mb = 50, 20, 56, 50
+    pw, ph = W - ml - mr, H - mt - mb
+    bw = pw / len(aucs) * 0.6
+
+    def Y(v): return mt + ph * (1 - v)  # AUC 0..1
+
+    p = _svg_open(W, H)
+    p.append(_text(W / 2, 18, "ROC AUC dla KAZDEGO dnia testowego (split 80/20)",
+                   13, "middle", C_TEXT, "bold"))
+    p.append(_text(W / 2, 36, f"{pooled['days_beat_random']}/{pooled['days_total']} dni powyzej 0.50 (losowego)",
+                   10, "middle", C_GREEN, "bold"))
+    for gv in [0.0, 0.25, 0.5, 0.75, 1.0]:
+        y = Y(gv)
+        col = C_RED if gv == 0.5 else C_GRID
+        wdt = "1.5" if gv == 0.5 else "1"
+        dash = ' stroke-dasharray="5 3"' if gv == 0.5 else ""
+        p.append(f'<line x1="{ml}" y1="{y:.1f}" x2="{ml+pw}" y2="{y:.1f}" stroke="{col}" stroke-width="{wdt}"{dash}/>')
+        p.append(_text(ml - 8, y + 4, f"{gv:.2f}", 9, "end", C_TEXT))
+    p.append(_text(ml + pw, Y(0.5) - 4, "losowy 0.50", 9, "end", C_RED))
+    for i, v in enumerate(aucs):
+        cx = ml + pw * (i + 0.5) / len(aucs)
+        x = cx - bw / 2
+        y = Y(v)
+        col = C_GREEN if v > 0.5 else C_RED
+        p.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{bw:.1f}" height="{Y(0)-y:.1f}" fill="{col}" rx="2"/>')
+        p.append(_text(cx, y - 5, f"{v:.2f}", 8, "middle", C_TEXT))
+        p.append(f'<text x="{cx:.1f}" y="{Y(0)+14:.1f}" font-size="8" text-anchor="end" '
+                 f'fill="{C_TEXT}" transform="rotate(-45 {cx:.1f} {Y(0)+14:.1f})">{labels[i]}</text>')
+    save("11_ocena_dzienna.svg", p)
+
+
+# ----------------------------------------------------------------------------
+# 12. TEST PERMUTACYJNY: rozklad AUC modelu losowego vs nasz wynik
+# ----------------------------------------------------------------------------
+def chart_permutation():
+    import numpy as np
+    _, pooled, _ = _compute_evaluation()
+    null = pooled["perm_null"]
+    obs = pooled["pooled_auc"]
+
+    W, H = 720, 320
+    ml, mr, mt, mb = 50, 20, 70, 45
+    pw, ph = W - ml - mr, H - mt - mb
+    lo, hi = 0.35, max(0.72, obs + 0.03)
+    nbins = 28
+    counts, edges = np.histogram(null, bins=nbins, range=(lo, hi))
+    cmax = max(counts.max(), 1)
+
+    def X(v): return ml + pw * (v - lo) / (hi - lo)
+    def Y(c): return mt + ph * (1 - c / cmax)
+
+    p = _svg_open(W, H)
+    p.append(_text(W / 2, 18, "Dowod 'lepiej niz losowo': test permutacyjny",
+                   13, "middle", C_TEXT, "bold"))
+    p.append(_text(W / 2, 36, "szare = 1000 modeli LOSOWYCH (przetasowane etykiety); zielona linia = nasz model",
+                   9, "middle", C_TEXT))
+    p.append(_text(W / 2, 50, f"p-value = {pooled['p_value']:.4f}  (zaden z 1000 losowych nie pobil naszego wyniku)",
+                   10, "middle", C_GREEN, "bold"))
+    bw = pw / nbins
+    for i, c in enumerate(counts):
+        if c == 0:
+            continue
+        x = X(edges[i])
+        p.append(f'<rect x="{x:.1f}" y="{Y(c):.1f}" width="{bw-1:.1f}" height="{Y(0)-Y(c):.1f}" fill="{C_GRAY}"/>')
+    p.append(f'<line x1="{ml}" y1="{Y(0):.1f}" x2="{ml+pw}" y2="{Y(0):.1f}" stroke="{C_AXIS}" stroke-width="1"/>')
+    # linia 0.5 (srodek losowego)
+    p.append(f'<line x1="{X(0.5):.1f}" y1="{mt}" x2="{X(0.5):.1f}" y2="{Y(0):.1f}" stroke="{C_RED}" stroke-width="1" stroke-dasharray="3 3"/>')
+    p.append(_text(X(0.5), mt - 2, "0.50", 9, "middle", C_RED))
+    # nasz obserwowany AUC
+    p.append(f'<line x1="{X(obs):.1f}" y1="{mt}" x2="{X(obs):.1f}" y2="{Y(0):.1f}" stroke="{C_GREEN}" stroke-width="2.5"/>')
+    p.append(_text(X(obs), mt - 2, f"nasz model {obs:.3f}", 10, "middle", C_GREEN, "bold"))
+    for gv in [0.4, 0.5, 0.6, 0.7]:
+        if lo <= gv <= hi:
+            p.append(_text(X(gv), Y(0) + 14, f"{gv:.1f}", 9, "middle", C_TEXT))
+    p.append(_text(W / 2, H - 8, "ROC AUC", 9, "middle", C_TEXT))
+    save("12_permutacja.svg", p)
+
+
+# ----------------------------------------------------------------------------
+# 13. FORMULA: wagi (wspolczynniki) regresji logistycznej
+# ----------------------------------------------------------------------------
+def chart_formula():
+    _, _, fml = _compute_evaluation()
+    terms = fml["terms"]
+    feats = terms["feature"].tolist()
+    coefs = terms["coef_std"].tolist()
+
+    W, H = 720, 300
+    ml, mr, mt, mb = 150, 80, 50, 20
+    pw, ph = W - ml - mr, H - mt - mb
+    rowh = ph / len(feats)
+    barh = rowh * 0.55
+    amax = max(abs(min(coefs)), abs(max(coefs))) * 1.15 or 1
+    x0 = ml + pw / 2  # zero w srodku
+
+    def X(v): return x0 + (pw / 2) * v / amax
+
+    p = _svg_open(W, H)
+    p.append(_text(W / 2, 18, "Formula modelu: wplyw cech na p(szczyt)",
+                   13, "middle", C_TEXT, "bold"))
+    p.append(_text(W / 2, 36, "waga + (zielona) podnosi prawd. szczytu, - (czerwona) obniza; dlugosc = sila",
+                   9, "middle", C_TEXT))
+    p.append(f'<line x1="{x0:.1f}" y1="{mt}" x2="{x0:.1f}" y2="{mt+ph}" stroke="{C_AXIS}" stroke-width="1"/>')
+    for i, (f, c) in enumerate(zip(feats, coefs)):
+        cy = mt + rowh * (i + 0.5)
+        p.append(_text(ml - 8, cy + 3, f, 10, "end", C_TEXT))
+        col = C_GREEN if c >= 0 else C_RED
+        x1, x2 = (x0, X(c)) if c >= 0 else (X(c), x0)
+        p.append(f'<rect x="{x1:.1f}" y="{cy-barh/2:.1f}" width="{abs(x2-x1):.1f}" height="{barh:.1f}" fill="{col}" rx="2"/>')
+        tx = X(c) + (6 if c >= 0 else -6)
+        anc = "start" if c >= 0 else "end"
+        p.append(_text(tx, cy + 3, f"{c:+.3f}", 9, anc, C_TEXT, "bold"))
+    save("13_formula.svg", p)
+
+
 if __name__ == "__main__":
     print("Generuje wykresy SVG do docs/assets/ ...")
     chart_price()
@@ -557,4 +699,7 @@ if __name__ == "__main__":
     chart_replay()
     chart_roc_distributions()
     chart_roc_curve()
+    chart_daywise_auc()
+    chart_permutation()
+    chart_formula()
     print("Gotowe.")

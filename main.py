@@ -18,6 +18,7 @@ from src.backtest import compare_models, pick_best_model, train_and_save_best
 from src.config import load_config
 from src.data_sources import fetch_intraday_yf, get_daily_history
 from src.features import build_daily_context_features, build_features, daily_seasonality, intraday_seasonality
+from src.evaluate import daywise_evaluation, logistic_formula
 from src.replay import load_intraday_for_replay, replay_session
 
 pd.set_option("display.width", 120)
@@ -142,6 +143,62 @@ def cmd_replay(cfg, synthetic=False):
           "duza wariancje. Pelna ocena = `backtest` (walk-forward na wielu oknach).")
 
 
+def cmd_evaluate(cfg, synthetic=False, train_frac=0.8, model_name=None):
+    """Ocena dzien-po-dniu na chronologicznym splicie + dowod 'lepiej niz losowo'."""
+    print("Wczytuje dane do oceny dzien-po-dniu...")
+    intraday, source = load_intraday_for_replay(cfg, synthetic=synthetic)
+    print(f"Zrodlo danych: {source}")
+
+    if synthetic:
+        daily_ctx = None
+        model_name = model_name or "logistic_regression"
+    else:
+        daily = get_daily_history(cfg, refresh_live=True)
+        daily_ctx = build_daily_context_features(daily)
+        if model_name is None:
+            try:
+                _, meta = load_trained_model(cfg)
+                model_name = meta.get("model_name", "logistic_regression")
+            except FileNotFoundError:
+                model_name = "logistic_regression"
+
+    feat_df, feature_cols = build_features(intraday, daily_ctx, cfg)
+    per_day, pooled, model = daywise_evaluation(
+        feat_df, feature_cols, cfg, model_name, train_frac=train_frac)
+
+    print(f"\nModel: {pooled['model']}  |  split chronologiczny "
+          f"{int(train_frac*100)}/{100-int(train_frac*100)}")
+    print(f"Sesje treningowe: {pooled['n_train_sessions']}  |  "
+          f"testowe: {pooled['n_test_sessions']}")
+
+    print("\n=== Ocena KAZDEGO dnia testowego ===")
+    view = per_day.copy()
+    for c in ("auc",):
+        view[c] = view[c].map(lambda v: f"{v:.3f}" if pd.notna(v) else "-")
+    for c in ("precyzja", "pokrycie"):
+        view[c] = view[c].map(lambda v: f"{v:.0%}" if pd.notna(v) else "-")
+    print(view.to_string(index=False))
+
+    print("\n=== Czy to lepiej niz losowo? ===")
+    print(f"ROC AUC na calym tescie (pooled): {pooled['pooled_auc']:.3f}")
+    print(f"AUC losowego modelu (permutacja etykiet): "
+          f"{pooled['perm_null_mean']:.3f} +/- {pooled['perm_null_std']:.3f}")
+    print(f"p-value (szansa, ze taki AUC wyszedl przez przypadek): {pooled['p_value']:.4f}")
+    print(f"Dni testowych z AUC > 0.5: {pooled['days_beat_random']} / {pooled['days_total']}")
+
+    fml = logistic_formula(model, feature_cols)
+    if fml:
+        print("\n=== Formula modelu (regresja logistyczna) ===")
+        print("p(szczyt) = 1 / (1 + exp(-z))")
+        print(f"z = {fml['intercept']:+.3f}  +  SUMA[ coef_std_j * (x_j - srednia_j) / odchylenie_j ]")
+        print("\nWagi po standaryzacji (im wieksza |waga|, tym wazniejsza cecha;")
+        print("znak + => wyzsza wartosc cechy podnosi prawdopodobienstwo szczytu):")
+        print(fml["terms"].to_string(index=False,
+              formatters={"coef_std": "{:+.3f}".format}))
+    print("\nUWAGA: jedna sesja/jeden split ma duza wariancje. Pelna ocena = "
+          "`backtest` (walk-forward na wielu oknach).")
+
+
 def main():
     parser = argparse.ArgumentParser(description="SCW - intraday timing toolkit")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -151,6 +208,11 @@ def main():
     p_replay = sub.add_parser("replay", help="Odtworz jedna sesje swieca-po-swiecy")
     p_replay.add_argument("--synthetic", action="store_true",
                           help="Uzyj sesji syntetycznej (ilustracja, bez internetu)")
+    p_eval = sub.add_parser("evaluate", help="Ocena dzien-po-dniu + test 'lepiej niz losowo'")
+    p_eval.add_argument("--synthetic", action="store_true",
+                        help="Uzyj danych syntetycznych (ilustracja, bez internetu)")
+    p_eval.add_argument("--train-frac", type=float, default=0.8,
+                        help="Udzial sesji treningowych (chronologicznie). Domyslnie 0.8")
 
     args = parser.parse_args()
     cfg = load_config()
@@ -163,6 +225,8 @@ def main():
         cmd_live(cfg)
     elif args.command == "replay":
         cmd_replay(cfg, synthetic=args.synthetic)
+    elif args.command == "evaluate":
+        cmd_evaluate(cfg, synthetic=args.synthetic, train_frac=args.train_frac)
 
 
 if __name__ == "__main__":

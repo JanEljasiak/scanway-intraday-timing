@@ -7,8 +7,9 @@
 >
 > Ten dokument podsumowuje wizualnie: (1) eksplorację danych (EDA),
 > (2) inżynierię cech, (3) co dokładnie jest testowane (interwał/target),
-> (4) proces wyboru modelu i porównanie kandydatów oraz (5) demonstrację
-> działania na pojedynczej sesji (`replay`).
+> (4) proces wyboru modelu i porównanie kandydatów, (5) demonstrację
+> działania na pojedynczej sesji (`replay`) oraz (6) ocenę dzień-po-dniu z
+> dowodem, że model bije losowy (`evaluate`).
 > Wykresy są generowane skryptem [`tools/make_report_charts.py`](../tools/make_report_charts.py)
 > z prawdziwych danych — odtworzysz je komendą `py tools/make_report_charts.py`.
 
@@ -343,7 +344,101 @@ czystszych alertów; niżej (50%) → więcej, kosztem precyzji.
 
 ---
 
-## 6. Następne kroki (rekomendacje)
+## 6. Ocena dzień-po-dniu i dowód, że model bije losowy
+
+> Komenda: `py main.py evaluate` (realne dane) lub
+> `py main.py evaluate --synthetic` (offline). Split **chronologiczny 80/20**:
+> model uczy się na 80% najwcześniejszych sesji, a oceniamy go na 20%
+> najpóźniejszych — których nigdy nie widział.
+
+### Dlaczego nie klasyczny cross-validation (k-fold)?
+
+Słusznie zauważyłeś, że na małym zbiorze CV jest wątpliwe — ale problem jest
+głębszy: to **szereg czasowy**. Klasyczny k-fold tasuje próbki losowo, więc
+wsadziłby świece z przyszłości do treningu obok testowych z przeszłości
+(**przeciek**) i zawyżył wynik. Dlatego:
+- pełną ocenę robi **walk-forward** (`backtest`, §3–4) — to jest „CV dla
+  szeregów czasowych”,
+- tutaj pokazujemy **jeden uczciwy split 80/20** dzień-po-dniu, żeby było
+  widać każdą sesję osobno i dało się policzyć, czy to nie przypadek.
+
+### Wynik: każdy dzień testowy osobno
+
+![Ocena dzienna](assets/11_ocena_dzienna.svg)
+
+Każdy słupek to ROC AUC jednego dnia testowego. **7 z 8 dni jest powyżej 0.50**
+(linia losowego). Dni bywają różne — to oczekiwane przy małej próbie — ale
+przewaga jest systematyczna, nie pojedynczy „szczęśliwy strzał”.
+
+### Dowód statystyczny: test permutacyjny (dla laika)
+
+To najważniejszy wykres, jeśli chcesz mieć pewność, że to **nie przypadek**:
+
+![Test permutacyjny](assets/12_permutacja.svg)
+
+**Jak to czytać, krok po kroku:**
+1. Bierzemy nasz model i jego prawdopodobieństwa na zbiorze testowym.
+2. **1000 razy losowo tasujemy prawdziwe odpowiedzi** (target) i liczymy AUC.
+   To symuluje „model, który nic nie umie” — czysty przypadek.
+3. Szary histogram to wyniki tych 1000 losowych prób — kupią się wokół **0.50**
+   (±0.04), bo losowy model z definicji nie odróżnia klas.
+4. **Zielona linia to nasz model (AUC ≈ 0.68)** — leży daleko na prawo od
+   całej chmury losowych wyników.
+5. **p-value ≈ 0.000** oznacza: *żaden* z 1000 losowych modeli nie dorównał
+   naszemu. Szansa, że taki wynik to czysty fart, jest praktycznie zerowa.
+
+> 🟢 **To jest właśnie dowód, o który prosiłeś:** model nie jest losowy.
+> Jego przewaga nad rzutem monetą jest statystycznie istotna.
+
+### Czy to znaczy, że model jest „dobry”?
+
+Nie — znaczy, że jest **niezaprzeczalnie lepszy niż losowy**, ale wciąż
+**słaby w sensie bezwzględnym** (AUC ~0.64–0.68). Dwie rzeczy naraz są
+prawdziwe: *(a)* sygnał istnieje i nie jest przypadkiem, *(b)* jest na tyle
+słaby, że to narzędzie pomocnicze, nie automat do handlu. (Liczby z `evaluate
+--synthetic` są ilustracyjne; realny `backtest` dał AUC **0.642**.)
+
+### Dlaczego wybrałem akurat regresję logistyczną (i co ona właściwie liczy)
+
+W rankingu po ROC AUC (§4.2) `logistic_regression` wypadła najlepiej spośród
+realnych modeli. Ma trzy zalety, które przeważyły:
+
+1. **Najwyższy ROC AUC** — najlepiej rozdziela „szczyt” od „nie-szczytu”.
+2. **Jest w pełni interpretowalna** — w przeciwieństwie do lasów/SVM widać
+   dokładnie, dlaczego podejmuje decyzję (poniżej).
+3. **Mało parametrów = mniejsze ryzyko przeuczenia** na 57 sesjach.
+
+**Jej formuła (cały algorytm alertowania) — jawnie:**
+
+```
+z = b₀ + Σⱼ  wⱼ · (xⱼ − średniaⱼ) / odchylenieⱼ        # standaryzacja + ważona suma
+p(szczyt) = 1 / (1 + e^(−z))                            # ściśnięcie do zakresu 0–1
+ALERT, jeśli  p(szczyt) ≥ 0.60                          # próg z config.yaml
+```
+
+To wszystko. Model standaryzuje każdą cechę (odejmuje średnią, dzieli przez
+odchylenie), mnoży przez wagę `wⱼ`, sumuje, dodaje wyraz wolny `b₀`, a wynik
+przepuszcza przez funkcję logistyczną, która zamienia dowolną liczbę na
+prawdopodobieństwo 0–1. Alert pada, gdy to prawdopodobieństwo przekroczy próg.
+
+**Wagi (kierunek i siła wpływu każdej cechy):**
+
+![Formuła modelu](assets/13_formula.svg)
+
+Jak to czytać po ludzku (na danych ilustracyjnych):
+- **`rsi_14` (+)** — im wyżej wykupiony rynek, tym większa szansa szczytu
+  (intuicyjne: po silnym wzroście częściej przychodzi spadek).
+- **`minute_of_day` (−)** — im później w sesji, tym mniejsza szansa „szczytu
+  przed spadkiem” (zgadza się z §1.4: szczyt zwykle rano).
+- **`ret_5`, `ret_1` (−)** — świeży spadek zmniejsza szansę dalszego spadku.
+
+Na Twoim komputerze `py main.py backtest` (oraz `evaluate`) wypisze **realne**
+wagi z prawdziwych danych — powyższe pochodzą z sesji syntetycznej i służą
+pokazaniu, *jak czytać* tę formułę.
+
+---
+
+## 7. Następne kroki (rekomendacje)
 
 1. **Naprawić `vol_zscore`** (§2.3), żeby nie kasować świecy 09:00 z treningu.
 2. **Lepsze kodowanie dnia tygodnia** — zamiast liniowego `dow_num` użyć

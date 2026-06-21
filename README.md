@@ -121,7 +121,22 @@ precyzje/pokrycie. To najlepszy sposob, zeby ZOBACZYC jak narzedzie dziala w
 praktyce. Pelne omowienie z wykresami (w tym co dokladnie mierzy ROC AUC):
 [docs/RAPORT_ANALIZA.md](docs/RAPORT_ANALIZA.md) (sekcje 4.4 i 5).
 
-### 4. Uruchom alert live
+### 4. Ocena dzien-po-dniu + dowod, ze model bije losowy (evaluate)
+
+```bash
+py main.py evaluate                  # split chronologiczny 80/20 na realnych danych
+py main.py evaluate --synthetic      # offline (dane ilustracyjne)
+py main.py evaluate --train-frac 0.8 # zmien proporcje treningu
+```
+
+Trenuje model na 80% najwczesniejszych sesji i ocenia KAZDY dzien testowy
+osobno (ROC AUC, precyzja, pokrycie). Dodatkowo robi **test permutacyjny**
+(1000 modeli z przetasowanymi etykietami) i podaje p-value - czyli formalny
+dowod, czy wynik jest lepszy niz losowy. Wypisuje tez jawna **formule**
+regresji logistycznej (wagi cech). Omowienie: sekcja 6 w
+[docs/RAPORT_ANALIZA.md](docs/RAPORT_ANALIZA.md).
+
+### 5. Uruchom alert live
 
 ```bash
 py main.py live
