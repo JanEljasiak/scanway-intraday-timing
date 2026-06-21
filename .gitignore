@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# wytrenowane modele i cache - generowane lokalnie przez `python main.py backtest`
+models/*.joblib
+models/*.json
+data/*.cache.csv
+
+.DS_Store

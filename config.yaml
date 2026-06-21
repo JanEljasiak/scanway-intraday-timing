@@ -1,0 +1,26 @@
+# Konfiguracja projektu - SCW (Scanway SA) intraday timing
+# Zmieniaj te wartosci bez ruszania kodu.
+
+ticker_yf: "SCW.WA"                       # ticker w yfinance (Warszawa)
+stooq_symbol_candidates: ["scw", "scw.pl"]  # warianty symbolu na Stooq
+
+local_daily_csv: "data/scw_d.csv"          # lokalny cache/seed danych dziennych
+
+intraday_interval: "15m"                   # rozdzielczosc danych live (yfinance)
+intraday_period: "60d"                     # max okno dla 15m w yfinance
+
+# definicja "dobrego momentu sprzedazy" uzywana do treningu modelu:
+sell_horizon_bars: 4                       # 4 x 15min = patrzymy godzine w przod
+sell_target_drop_pct: 0.5                  # jesli w tym horyzoncie cena spadnie
+                                            # o ten % od biezacej - "tu warto bylo sprzedac"
+
+walk_forward_splits: 6                     # liczba okien w walidacji chronologicznej
+
+alert_probability_threshold: 0.6           # od jakiego prawdopodobienstwa wysylamy alert
+poll_seconds: 900                          # co ile sekund odpytujemy rynek (15 min)
+
+market_open: "09:00"
+market_close: "17:00"
+timezone: "Europe/Warsaw"
+
+random_state: 42

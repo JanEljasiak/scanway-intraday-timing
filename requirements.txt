@@ -1,0 +1,13 @@
+yfinance>=0.2.40
+pandas>=2.0
+numpy>=1.24
+scikit-learn>=1.3
+joblib>=1.3
+requests>=2.31
+python-dotenv>=1.0
+PyYAML>=6.0
+
+# opcjonalnie, jesli chcesz przetestowac tez XGBoost (mocniejszy model
+# gradient boosting) - odkomentuj. Skrypt dziala bez niego, po prostu
+# pominie ten model w porownaniu.
+# xgboost>=2.0
