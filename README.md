@@ -46,8 +46,8 @@ scanway-intraday-timing/
 git clone <adres-twojego-repo>
 cd scanway-intraday-timing
 
-python3 -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+py -m venv venv
+source venv/Scripts/activate    # Windows (Git Bash); cmd: venv\Scripts\activate
 
 pip install -r requirements.txt
 
@@ -65,7 +65,7 @@ pytest tests/
 ### 1. Odswiez dane i zobacz sezonowosc
 
 ```bash
-python main.py update-data
+py main.py update-data
 ```
 
 Dociaga najnowsze dane dzienne ze Stooq (jesli jest internet - inaczej
@@ -75,7 +75,7 @@ pokazuje, ktore godziny/dni tygodnia historycznie wypadaly najlepiej.
 ### 2. Przetestuj i porownaj modele ML
 
 ```bash
-python main.py backtest
+py main.py backtest
 ```
 
 Buduje zbior cech (dlugi kontekst dzienny + krotkie dane intraday),
@@ -100,7 +100,7 @@ nie jest niespodzianka).
 ### 3. Uruchom alert live
 
 ```bash
-python main.py live
+py main.py live
 ```
 
 W godzinach sesji GPW (domyslnie 9:00-17:00) odpytuje rynek co 15 minut,
@@ -129,6 +129,6 @@ Najwazniejsze parametry:
 ## Aktualizacja danych historycznych
 
 `data/scw_d.csv` to seed danych od debiutu spolki. Komenda
-`python main.py update-data` (i `backtest`/`live`) probuje go automatycznie
+`py main.py update-data` (i `backtest`/`live`) probuje go automatycznie
 dociagac swiezszymi sesjami ze Stooq przy kazdym uruchomieniu - jesli nie
 ma internetu, po prostu korzysta z tego co jest na dysku.
