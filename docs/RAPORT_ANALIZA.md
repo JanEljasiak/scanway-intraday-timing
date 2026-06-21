@@ -226,27 +226,78 @@ małej, mocno zmiennej spółki to nie jest niespodzianka. Praktyczny wniosek:
 - realnie najwięcej wnosi prosta reguła z EDA: **09:00 bardzo często jest
   szczytem dnia** (§1.4) — to warto wykorzystać niezależnie od modelu ML.
 
+### 4.4 Co dokładnie mierzy ROC AUC w NASZYM przypadku
+
+To kluczowe dla zrozumienia całego projektu, więc rozłóżmy to na czynniki.
+
+**Definicja dopasowana do naszego zadania.** Klasa pozytywna to „lokalny
+szczyt” (`target=1`, ~23% świec — moment, w którym opłacało się sprzedać).
+ROC AUC odpowiada na pytanie:
+
+> *Jeśli wylosuję jedną świecę „był dobry moment na sprzedaż” i jedną świecę
+> „nie był”, jaka jest szansa, że model przypisze tej pierwszej WYŻSZE
+> prawdopodobieństwo szczytu?*
+
+- **AUC = 0.5** → model nie odróżnia jednych od drugich (rzut monetą).
+- **AUC = 1.0** → idealne uszeregowanie (każdy realny szczyt dostaje wyższy
+  wynik niż każdy nie-szczyt).
+- **AUC = 0.642 (nasz backtest)** → model trafia w to uszeregowanie w ~64%
+  losowań. Lepiej niż przypadek, ale słabo.
+
+**Czemu mierzymy to, a nie „skuteczność” (accuracy) albo F1?**
+
+1. **Niezależność od progu.** System live wysyła alert, gdy
+   `proba ≥ alert_probability_threshold`. Próg można zmieniać (0.5? 0.6?
+   0.7?). ROC AUC ocenia **cały ranking** prawdopodobieństw naraz, niezależnie
+   od konkretnego progu — mówi, ile w ogóle „da się wycisnąć” z modelu.
+2. **Odporność na niezbalansowanie.** Przy 77/23 accuracy i F1 dają się
+   „oszukać” przewidywaniem klasy większościowej (§3.2–4.1). AUC nie — bo
+   patrzy na rozdzielenie klas, nie na liczbę trafień.
+
+**Jak to wygląda wizualnie — rozdzielenie wyników modelu:**
+
+![Rozkłady wyników ROC](assets/09_roc_rozklady.svg)
+
+ROC AUC to formalna miara tego, **jak słabo nakładają się** te dwa rozkłady.
+Gdyby pomarańczowe (realne momenty sprzedaży) leżały całe na prawo od
+szarych — AUC=1.0. Gdyby idealnie się pokrywały — AUC=0.5.
+
+**Krzywa ROC** — to samo, ujęte jako kompromis „złapane szczyty” (TPR) kontra
+„fałszywe alarmy” (FPR) przy przesuwaniu progu:
+
+![Krzywa ROC](assets/10_roc_krzywa.svg)
+
+> Czerwona przekątna = losowy (0.5). Niebieska przerywana = orientacyjny
+> kształt dla realnego backtestu (AUC 0.642) — ledwie wybrzusza się nad
+> przekątną, co wizualnie pokazuje „słaby, ale niezerowy” sygnał. Zielona =
+> sesja testowa z §5 (wysokie AUC, bo to czysta sesja ilustracyjna — realne
+> dane są dużo bardziej zaszumione).
+
 ---
 
-## 5. Demonstracja w praktyce — `replay` jednej sesji
+## 5. Demonstracja w praktyce — `replay` historycznej sesji (out-of-sample)
 
 Backtest (§3–4) mówi *jak dobry jest model statystycznie*, ale nie pokazuje,
-**jak to wygląda w ciągu jednego dnia**. Do tego służy nowa komenda:
+**jak to wygląda w ciągu jednego dnia**. Do tego służy komenda `replay`:
 
 ```bash
-py main.py replay              # ostatnia realna sesja (wymaga modelu + internetu)
+py main.py replay              # ostatnia historyczna sesja (z internetu)
 py main.py replay --synthetic  # sesja ilustracyjna, działa offline
 ```
 
-Przechodzi ona sesję **świeca po świecy** i dla każdej 15-min świecy liczy
-prawdopodobieństwo szczytu, porównując alerty modelu z faktycznymi momentami
-sprzedaży (ground truth) i rzeczywistym szczytem dnia.
+**Kluczowe: replay jest out-of-sample.** Model jest tu trenowany na
+wszystkich sesjach **OPRÓCZ tej jednej**, którą odtwarzamy (funkcja
+`train_excluding_session`). Czyli testujemy go na sesji, której **nigdy nie
+widział na treningu** — to uczciwa miniatura tego, co robi walk-forward, tyle
+że pokazana świeca-po-świecy. (To inny model niż produkcyjny
+`best_model.joblib`, który celowo uczy się na całości danych.)
 
 ![Replay sesji](assets/08_replay_sesja.svg)
 
 > Wykres pochodzi z sesji **ilustracyjnej** (`--synthetic`, seed=42) — pokazuje
 > *mechanizm*, nie prawdziwe notowania (środowisko bez internetu). Na Twoim
-> komputerze `py main.py replay` wygeneruje to samo z realnych danych.
+> komputerze `py main.py replay` wygeneruje to samo z realnych danych ostatniej
+> historycznej sesji.
 
 ### Jak to czytać
 
@@ -254,27 +305,41 @@ sprzedaży (ground truth) i rzeczywistym szczytem dnia.
 - **Czerwona kropka:** rzeczywisty szczyt dnia (tu: **09:30** — zgodnie z
   obserwacją z §1.4, że szczyt często wypada rano).
 - **Pomarańczowe pasma:** świece, w których *faktycznie* opłacało się sprzedać
-  (`target=1`).
+  (`target=1`) — tu skupione w fazie spadku 09:15–12:15.
 - **Zielone trójkąty / fioletowa linia (dół):** alert modelu, gdy
   prawdopodobieństwo przekracza próg 60% (czerwona linia przerywana).
 
 ### Co ta sesja pokazuje (i czego uczy)
 
-Na tej ilustracji: **21 alertów, 27 realnych momentów sprzedaży, 16 trafień →
-precyzja sesji 76%, pokrycie 59%.** Najważniejsza obserwacja jest jednak
-jakościowa:
+Wynik na tej out-of-sample sesji: **15 alertów, 14 realnych momentów
+sprzedaży, 13 trafień → precyzja 87%, pokrycie 93%, ROC AUC sesji 0.93.**
+Model trzyma wysokie prawdopodobieństwo dokładnie w fazie spadkowej
+(09:00–12:30) i sam je obniża, gdy cena się stabilizuje po południu — to
+właśnie „dobry ranking”, który mierzy ROC AUC (§4.4).
 
-- Model **łapie okno spadkowe** po porannym szczycie — alerty zapalają się w
-  fazie zniżki, czyli mniej więcej tam, gdzie trzeba.
-- Ale **alerty startują ~30 min po faktycznym szczycie (09:30 → pierwszy alert
-  10:00)** — to nie błąd, lecz nieunikniona konsekwencja tego, że model widzi
-  świecę dopiero po jej zamknięciu, a dane live mają ~15 min opóźnienia.
-  To wizualnie potwierdza ostrzeżenie z `src/alert.py`: realne opóźnienie
-  reakcji może sięgać ~30 min.
+**Wpływ progu alertu na tę sesję** (z `replay`, funkcja `threshold_sweep`):
+
+| Próg | Alertów | Trafione | Precyzja | Pokrycie |
+|---|---|---|---|---|
+| 40% | 21 | 13 | 62% | 93% |
+| 50% | 16 | 13 | 81% | 93% |
+| **60%** | **15** | **13** | **87%** | **93%** |
+| 70% | 12 | 11 | 92% | 79% |
+| 80% | 2 | 1 | 50% | 7% |
+
+To jest praktyczne tłumaczenie ROC AUC: **jeden model = jeden ranking**, a
+przesuwając próg wybierasz punkt na krzywej ROC. Wyżej (70%) → mniej, ale
+czystszych alertów; niżej (50%) → więcej, kosztem precyzji.
+
+> ⚠️ **Uczciwa uwaga:** ta ilustracyjna sesja ma AUC 0.93, bo jest „czysta”.
+> Realny backtest na 57 zaszumionych sesjach dał AUC **0.642** (§4) — i to jest
+> liczba, której należy ufać. Pojedyncza sesja ma dużą wariancję; służy do
+> *zrozumienia mechanizmu*, nie do oceny skuteczności.
 
 > **Praktyczny wniosek:** narzędzie wskazuje *fazę* „po szczycie, czas
-> rozważyć sprzedaż”, a nie chirurgiczny punkt maksimum. Dla wczesnego
-> wyjścia warto łączyć je z prostą regułą z EDA (szczyt często ~09:00–09:30).
+> rozważyć sprzedaż”, a nie chirurgiczny punkt maksimum. Na realnych danych
+> dochodzi ~15-min opóźnienie yfinance, więc alert na żywo bywa spóźniony o
+> ~15–30 min — warto łączyć go z regułą z EDA (szczyt często ~09:00–09:30).
 
 ---
 

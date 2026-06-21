@@ -61,10 +61,14 @@ def make_synthetic_session(cfg: Config, n_sessions: int = 40, seed: int = 42) ->
         peak_at_open = is_last or rng.random() < 0.55
         open_px = base_price * (1 + rng.normal(0, 0.01))
         if peak_at_open:
-            # rano lokalny szczyt, potem wyrazny spadek reszte dnia
+            # realistyczny ksztalt: szczyt rano -> spadek do poludnia ->
+            # stabilizacja po poludniu. Dzieki temu "dobry moment sprzedazy"
+            # (target=1) skupia sie w fazie spadkowej, a nie przez caly dzien.
+            n_flat = bars_per_day - 3 - 12
             drift = np.concatenate([
-                rng.normal(0.004, 0.002, 3),          # mocny ruch w gore na otwarciu
-                rng.normal(-0.004, 0.003, bars_per_day - 3),  # spadek reszte dnia
+                rng.normal(0.004, 0.002, 3),     # ruch w gore na otwarciu (szczyt)
+                rng.normal(-0.005, 0.003, 12),   # spadek do ~poludnia
+                rng.normal(0.0005, 0.0025, n_flat),  # stabilizacja/lekkie odbicie
             ])
         else:
             drift = rng.normal(0.0002, 0.004, bars_per_day)  # dzien bez wyraznego wzorca
@@ -105,6 +109,58 @@ def load_intraday_for_replay(cfg: Config, synthetic: bool) -> tuple[pd.DataFrame
     out.index.name = "ts"
     out.reset_index().to_csv(snap, index=False)
     return df, "yfinance live (zapisano snapshot)"
+
+
+def train_excluding_session(feat_df: pd.DataFrame, feature_cols: list, cfg: Config,
+                            model_name: str, holdout_date) -> object:
+    """Trenuje model na WSZYSTKICH sesjach OPROCZ holdout_date.
+
+    Dzieki temu odtwarzana sesja jest prawdziwie OUT-OF-SAMPLE - model jej
+    nigdy nie widzial, wiec wynik replay nie jest zafalszowany przeciekiem.
+    To inny model niz produkcyjny (`best_model.joblib` trenowany na calosci) -
+    tutaj celowo, bo testujemy "jak by zadzialal na nieznanej sesji".
+    """
+    from sklearn.base import clone
+
+    from .models import get_candidate_models
+    models = get_candidate_models(random_state=cfg.random_state)
+    if model_name not in models:
+        model_name = "logistic_regression"
+    model = clone(models[model_name])
+    train = feat_df[feat_df["date"] != holdout_date]
+    model.fit(train[feature_cols], train["target_local_top"])
+    return model, model_name, len(train)
+
+
+def threshold_sweep(rep: pd.DataFrame, thresholds=(0.4, 0.5, 0.6, 0.7, 0.8)) -> pd.DataFrame:
+    """Dla odtworzonej sesji: jak prog alertu wplywa na precyzje i pokrycie.
+
+    Laczy ROC AUC (rozdzielczosc niezalezna od progu) z praktyka: pokazuje,
+    ze JEDEN model (jeden ranking proba) daje rozne kompromisy zaleznie od
+    wybranego progu `alert_probability_threshold`.
+    """
+    n_target = int((rep["target"] == 1).sum())
+    rows = []
+    for th in thresholds:
+        alert = rep["proba"] >= th
+        n_alert = int(alert.sum())
+        hits = int((alert & (rep["target"] == 1)).sum())
+        rows.append({
+            "prog": f"{th:.0%}",
+            "n_alertow": n_alert,
+            "trafione": hits,
+            "precyzja": hits / n_alert if n_alert else float("nan"),
+            "pokrycie": hits / n_target if n_target else float("nan"),
+        })
+    return pd.DataFrame(rows)
+
+
+def session_roc_auc(rep: pd.DataFrame) -> float:
+    """ROC AUC liczone na samej odtworzonej sesji (out-of-sample)."""
+    from sklearn.metrics import roc_auc_score
+    if rep["target"].nunique() < 2:
+        return float("nan")
+    return float(roc_auc_score(rep["target"], rep["proba"]))
 
 
 def replay_session(intraday_df: pd.DataFrame, daily_ctx, cfg: Config,

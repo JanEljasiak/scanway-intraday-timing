@@ -76,34 +76,44 @@ def cmd_live(cfg):
 
 
 def cmd_replay(cfg, synthetic=False):
-    """Odtwarza jedna sesje swieca-po-swiecy i pokazuje, gdzie model wyslalby
-    alert sprzedazy w porownaniu z faktycznymi szczytami (ground truth)."""
+    """Odtwarza jedna HISTORYCZNA sesje (out-of-sample) swieca-po-swiecy i
+    pokazuje, jak zadzialalby alert na sesji, ktorej model NIE widzial."""
+    from src.replay import session_roc_auc, threshold_sweep, train_excluding_session
+
     print("Wczytuje dane intraday do odtworzenia sesji...")
     intraday, source = load_intraday_for_replay(cfg, synthetic=synthetic)
     print(f"Zrodlo danych: {source}")
 
+    # tryb syntetyczny uzywa tylko cech intraday; realny dokłada kontekst dzienny
     if synthetic:
-        # tryb ilustracyjny: trenujemy szybki model na samych cechach intraday
-        from src.backtest import train_and_save_best
-        feat_df, feature_cols = build_features(intraday, None, cfg)
-        sessions = sorted(feat_df["date"].unique())
-        train_df = feat_df[feat_df["date"].isin(sessions[:-1])]  # bez ostatniej sesji
-        train_and_save_best(train_df, feature_cols, cfg, "logistic_regression")
-        model, meta = load_trained_model(cfg)
         daily_ctx = None
+        model_name = "logistic_regression"
     else:
-        model, meta = load_trained_model(cfg)
-        feature_cols = meta["feature_cols"]
         daily = get_daily_history(cfg, refresh_live=True)
         daily_ctx = build_daily_context_features(daily)
+        try:
+            _, meta = load_trained_model(cfg)
+            model_name = meta.get("model_name", "logistic_regression")
+        except FileNotFoundError:
+            model_name = "logistic_regression"
 
-    rep = replay_session(intraday, daily_ctx, cfg,
-                         model, meta["feature_cols"], session_date=None)
+    feat_df, feature_cols = build_features(intraday, daily_ctx, cfg)
+    if feat_df.empty:
+        print("Za malo danych do odtworzenia sesji.")
+        return
+
+    holdout = sorted(feat_df["date"].unique())[-1]   # ostatnia sesja = testowa
+    model, model_name, n_train = train_excluding_session(
+        feat_df, feature_cols, cfg, model_name, holdout)
+    print(f"\nModel '{model_name}' wytrenowany na {n_train} probkach "
+          f"BEZ sesji {holdout} (out-of-sample).")
+
+    rep = replay_session(intraday, daily_ctx, cfg, model, feature_cols, session_date=holdout)
     if rep.empty:
         print("Za malo danych do odtworzenia sesji.")
         return
 
-    print(f"\n=== Odtworzenie ostatniej sesji (prog alertu {cfg.alert_probability_threshold:.0%}) ===")
+    print(f"\n=== Sesja testowa {holdout} (prog alertu {cfg.alert_probability_threshold:.0%}) ===")
     view = rep.copy()
     view["proba"] = (view["proba"] * 100).round(0).astype(int).astype(str) + "%"
     view["alert"] = view["alert"].map({True: "ALERT", False: ""})
@@ -113,16 +123,23 @@ def cmd_replay(cfg, synthetic=False):
         "time": "godz", "close": "cena", "target": "ground_truth"})
     print(view.to_string(index=False))
 
-    # podsumowanie skutecznosci na tej jednej sesji
+    # podsumowanie skutecznosci na tej jednej sesji + ROC AUC sesji
     n_alert = int(rep["alert"].sum())
     n_target = int(rep["target"].sum())
     hits = int(((rep["alert"]) & (rep["target"] == 1)).sum())
     prec = hits / n_alert if n_alert else float("nan")
     rec = hits / n_target if n_target else float("nan")
+    auc = session_roc_auc(rep)
     print(f"\nAlertow: {n_alert} | rzeczywistych momentow sprzedazy (target=1): {n_target}")
     print(f"Trafione alerty: {hits} | precyzja sesji: {prec:.0%} | pokrycie: {rec:.0%}")
-    print("\nUWAGA: to jedna sesja - sluzy ZROZUMIENIU dzialania, nie ocenie modelu."
-          " Pelna, uczciwa ocena jest w `backtest` (walk-forward, ROC AUC).")
+    print(f"ROC AUC tej sesji: {auc:.3f}  (0.5 = losowo, 1.0 = idealnie)")
+
+    print("\n--- Wplyw progu alertu na te sesje (analiza precyzja/pokrycie) ---")
+    print(threshold_sweep(rep).to_string(index=False,
+          formatters={"precyzja": "{:.0%}".format, "pokrycie": "{:.0%}".format}))
+
+    print("\nUWAGA: to JEDNA sesja out-of-sample - ilustruje dzialanie, ale ma "
+          "duza wariancje. Pelna ocena = `backtest` (walk-forward na wielu oknach).")
 
 
 def main():

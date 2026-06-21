@@ -108,15 +108,18 @@ nie jest niespodzianka).
 ### 3. Odtworz jedna sesje swieca-po-swiecy (replay)
 
 ```bash
-py main.py replay              # ostatnia realna sesja (wymaga modelu + internetu)
+py main.py replay              # ostatnia historyczna sesja (z internetu)
 py main.py replay --synthetic  # sesja ilustracyjna, dziala offline (bez internetu)
 ```
 
-Pokazuje, dla kazdej 15-min swiecy, prawdopodobienstwo "lokalnego szczytu"
-liczone przez model, i porownuje alerty z faktycznymi momentami sprzedazy
-(ground truth) oraz rzeczywistym szczytem dnia. To najlepszy sposob, zeby
-ZOBACZYC jak narzedzie dziala w praktyce. Pelne omowienie z wykresem:
-[docs/RAPORT_ANALIZA.md](docs/RAPORT_ANALIZA.md) (sekcja 5).
+Odtwarza sesje OUT-OF-SAMPLE: model jest trenowany na wszystkich sesjach
+OPROCZ tej odtwarzanej, wiec widzisz, jak zadzialalby na dniu, ktorego nie
+widzial na treningu. Dla kazdej 15-min swiecy pokazuje prawdopodobienstwo
+"lokalnego szczytu", porownuje alerty z faktycznymi momentami sprzedazy
+(ground truth) i szczytem dnia, liczy ROC AUC sesji oraz wplyw progu alertu na
+precyzje/pokrycie. To najlepszy sposob, zeby ZOBACZYC jak narzedzie dziala w
+praktyce. Pelne omowienie z wykresami (w tym co dokladnie mierzy ROC AUC):
+[docs/RAPORT_ANALIZA.md](docs/RAPORT_ANALIZA.md) (sekcje 4.4 i 5).
 
 ### 4. Uruchom alert live
 

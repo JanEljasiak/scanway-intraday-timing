@@ -348,29 +348,27 @@ def chart_intervals():
 # ----------------------------------------------------------------------------
 # 8. REPLAY: odtworzenie sesji - cena + alerty + ground truth (2 panele)
 # ----------------------------------------------------------------------------
-def chart_replay():
-    """Liczy replay na tej samej syntetycznej sesji co `replay --synthetic`
-    (seed=42), zeby wizualizacja w raporcie zgadzala sie z wynikiem komendy."""
+def _compute_replay():
+    """Liczy replay out-of-sample na tej samej syntetycznej sesji co
+    `replay --synthetic` (seed=42), zeby wykresy w raporcie zgadzaly sie z
+    wynikiem komendy. Zwraca DataFrame rep."""
     import sys
     sys.path.insert(0, str(ROOT))
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.pipeline import Pipeline
-    from sklearn.preprocessing import StandardScaler
-
     from src.config import load_config
     from src.features import build_features
-    from src.replay import make_synthetic_session, replay_session
+    from src.replay import make_synthetic_session, replay_session, train_excluding_session
 
     cfg = load_config()
     intraday = make_synthetic_session(cfg, n_sessions=40, seed=42)
     feat_df, cols = build_features(intraday, None, cfg)
-    sessions = sorted(feat_df["date"].unique())
-    train = feat_df[feat_df["date"].isin(sessions[:-1])]
-    model = Pipeline([("scale", StandardScaler()),
-                      ("clf", LogisticRegression(max_iter=1000, class_weight="balanced"))])
-    model.fit(train[cols], train["target_local_top"])
-    rep = replay_session(intraday, None, cfg, model, cols)
+    holdout = sorted(feat_df["date"].unique())[-1]
+    model, _, _ = train_excluding_session(feat_df, cols, cfg, "logistic_regression", holdout)
+    rep = replay_session(intraday, None, cfg, model, cols, session_date=holdout)
+    return rep, cfg
 
+
+def chart_replay():
+    rep, cfg = _compute_replay()
     n = len(rep)
     W, H = 860, 460
     ml, mr = 55, 20
@@ -452,6 +450,101 @@ def chart_replay():
           f"high@{rep['time'].iloc[hi_idx]}")
 
 
+# ----------------------------------------------------------------------------
+# 9. CO MIERZY ROC AUC: rozklad wynikow modelu dla obu klas (na sesji testowej)
+# ----------------------------------------------------------------------------
+def chart_roc_distributions():
+    rep, cfg = _compute_replay()
+    pos = rep.loc[rep["target"] == 1, "proba"].values  # realne momenty sprzedazy
+    neg = rep.loc[rep["target"] == 0, "proba"].values  # reszta
+
+    W, H = 720, 340
+    ml, mr, mt, mb = 50, 20, 70, 40
+    pw, ph = W - ml - mr, H - mt - mb
+    nbins = 10
+    edges = [i / nbins for i in range(nbins + 1)]
+
+    def hist(vals):
+        import numpy as np
+        h, _ = np.histogram(vals, bins=edges)
+        return h
+    hp, hn = hist(pos), hist(neg)
+    hmax = max(hp.max(), hn.max(), 1)
+
+    def X(b): return ml + pw * b / nbins
+    def Y(c): return mt + ph * (1 - c / hmax)
+
+    p = _svg_open(W, H)
+    p.append(_text(W / 2, 20, "Co mierzy ROC AUC: rozdzielenie wynikow modelu dla obu klas",
+                   13, "middle", C_TEXT, "bold"))
+    p.append(_text(W / 2, 38, "AUC = szansa, ze losowy 'moment sprzedazy' dostaje WYZSZY wynik niz losowy 'nie-szczyt'",
+                   9, "middle", C_TEXT))
+    p.append(_text(W / 2, 52, "Im mniejsze nakladanie sie slupkow, tym wyzszy AUC.", 9, "middle", C_TEXT))
+    bw = pw / nbins
+    for b in range(nbins):
+        # neg (szary) i pos (pomaranczowy) obok siebie w binie
+        xb = X(b)
+        p.append(f'<rect x="{xb+1:.1f}" y="{Y(hn[b]):.1f}" width="{bw/2-1:.1f}" height="{Y(0)-Y(hn[b]):.1f}" fill="{C_GRAY}" opacity="0.9"/>')
+        p.append(f'<rect x="{xb+bw/2:.1f}" y="{Y(hp[b]):.1f}" width="{bw/2-1:.1f}" height="{Y(0)-Y(hp[b]):.1f}" fill="{C_ORANGE}" opacity="0.9"/>')
+    p.append(f'<line x1="{ml}" y1="{Y(0):.1f}" x2="{ml+pw}" y2="{Y(0):.1f}" stroke="{C_AXIS}" stroke-width="1"/>')
+    for b in range(nbins + 1):
+        p.append(_text(X(b), Y(0) + 14, f"{edges[b]:.1f}", 8, "middle", C_TEXT))
+    p.append(_text(W / 2, H - 8, "wynik modelu = prawdopodobienstwo szczytu", 9, "middle", C_TEXT))
+    # legenda
+    p.append(f'<rect x="{ml}" y="{mt-2}" width="12" height="9" fill="{C_ORANGE}"/>')
+    p.append(_text(ml + 16, mt + 6, "realny moment sprzedazy (target=1)", 9, "start", C_TEXT))
+    p.append(f'<rect x="{ml+230}" y="{mt-2}" width="12" height="9" fill="{C_GRAY}"/>')
+    p.append(_text(ml + 246, mt + 6, "nie-szczyt (target=0)", 9, "start", C_TEXT))
+    save("09_roc_rozklady.svg", p)
+
+
+# ----------------------------------------------------------------------------
+# 10. KRZYWA ROC: sesja testowa + odniesienie do realnego backtestu (AUC 0.642)
+# ----------------------------------------------------------------------------
+def chart_roc_curve():
+    from sklearn.metrics import roc_auc_score, roc_curve
+    rep, cfg = _compute_replay()
+    fpr, tpr, _ = roc_curve(rep["target"], rep["proba"])
+    auc_sess = roc_auc_score(rep["target"], rep["proba"])
+
+    # krzywa orientacyjna dla AUC=0.642 (realny backtest): tpr = fpr**k, AUC=1/(k+1)
+    auc_real = 0.642
+    k = 1 / auc_real - 1
+    ref = [(i / 50, (i / 50) ** k) for i in range(51)]
+
+    W, H = 460, 440
+    ml, mr, mt, mb = 55, 20, 50, 50
+    pw, ph = W - ml - mr, H - mt - mb
+
+    def X(v): return ml + pw * v
+    def Y(v): return mt + ph * (1 - v)
+
+    p = _svg_open(W, H)
+    p.append(_text(W / 2, 20, "Krzywa ROC", 14, "middle", C_TEXT, "bold"))
+    p.append(_text(W / 2, 36, "im wyzej i lewiej, tym lepiej (wieksze pole pod krzywa = AUC)",
+                   9, "middle", C_TEXT))
+    # ramka + siatka
+    for g in [0, 0.25, 0.5, 0.75, 1.0]:
+        p.append(f'<line x1="{X(g):.1f}" y1="{Y(0):.1f}" x2="{X(g):.1f}" y2="{Y(1):.1f}" stroke="{C_GRID}" stroke-width="0.7"/>')
+        p.append(f'<line x1="{X(0):.1f}" y1="{Y(g):.1f}" x2="{X(1):.1f}" y2="{Y(g):.1f}" stroke="{C_GRID}" stroke-width="0.7"/>')
+        p.append(_text(X(g), Y(0) + 14, f"{g:.2f}", 8, "middle", C_TEXT))
+        p.append(_text(X(0) - 6, Y(g) + 3, f"{g:.2f}", 8, "end", C_TEXT))
+    # przekatna = losowy (AUC 0.5)
+    p.append(f'<line x1="{X(0):.1f}" y1="{Y(0):.1f}" x2="{X(1):.1f}" y2="{Y(1):.1f}" stroke="{C_RED}" stroke-width="1.5" stroke-dasharray="5 3"/>')
+    p.append(_text(X(0.72), Y(0.62), "losowy (0.50)", 9, "start", C_RED))
+    # krzywa orientacyjna realnego backtestu
+    rpts = " ".join(f"{X(a):.1f},{Y(b):.1f}" for a, b in ref)
+    p.append(f'<polyline fill="none" stroke="{C_BLUE}" stroke-width="2" stroke-dasharray="2 2" points="{rpts}"/>')
+    p.append(_text(X(0.55), Y(0.74), "realny backtest ~0.642", 9, "start", C_BLUE, "bold"))
+    # krzywa sesji testowej
+    spts = " ".join(f"{X(a):.1f},{Y(b):.1f}" for a, b in zip(fpr, tpr))
+    p.append(f'<polyline fill="none" stroke="{C_GREEN}" stroke-width="2.5" points="{spts}"/>')
+    p.append(_text(X(0.30), Y(0.96), f"sesja testowa (AUC {auc_sess:.2f})", 9, "start", C_GREEN, "bold"))
+    p.append(_text(W / 2, H - 26, "FPR (falszywe alarmy / nie-szczyty)", 10, "middle", C_TEXT))
+    p.append(f'<text x="16" y="{(mt+ph/2):.1f}" font-size="10" text-anchor="middle" fill="{C_TEXT}" transform="rotate(-90 16 {(mt+ph/2):.1f})">TPR (zlapane momenty sprzedazy)</text>')
+    save("10_roc_krzywa.svg", p)
+
+
 if __name__ == "__main__":
     print("Generuje wykresy SVG do docs/assets/ ...")
     chart_price()
@@ -462,4 +555,6 @@ if __name__ == "__main__":
     chart_ranking()
     chart_intervals()
     chart_replay()
+    chart_roc_distributions()
+    chart_roc_curve()
     print("Gotowe.")
