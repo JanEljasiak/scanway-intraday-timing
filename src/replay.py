@@ -96,9 +96,15 @@ def load_intraday_for_replay(cfg: Config, synthetic: bool) -> tuple[pd.DataFrame
 
     snap = Path(cfg.local_daily_csv_path).parent.parent / SNAPSHOT_PATH
     if snap.exists():
-        df = pd.read_csv(snap, parse_dates=["ts"]).set_index("ts")
-        df["date"] = pd.to_datetime(df["date"]).dt.date
-        df["time"] = pd.to_datetime(df["time"].astype(str)).dt.time
+        df = pd.read_csv(snap)
+        # ts bywa zapisany ze zmiennym offsetem (DST), wiec parsujemy przez UTC
+        # i konwertujemy do strefy rynku; date/time odtwarzamy z indeksu, zeby
+        # miec pewny DatetimeIndex (build_features uzywa .hour/.minute).
+        ts = pd.to_datetime(df["ts"], utc=True).dt.tz_convert(cfg.timezone)
+        df = df.drop(columns=["ts"]).set_index(ts)
+        df.index.name = "ts"
+        df["date"] = df.index.date
+        df["time"] = df.index.time
         return df, f"snapshot ({snap.name})"
 
     # ostatnia deska: yfinance live
