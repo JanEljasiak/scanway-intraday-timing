@@ -8,6 +8,8 @@ venv/
 models/*.joblib
 models/*.json
 data/*.cache.csv
-data/intraday_snapshot.csv
+# data/intraday_snapshot.csv jest commitowany celowo: to realny snapshot
+# danych intraday (~57 sesji), zeby raport i wykresy byly odtwarzalne
+# na PRAWDZIWYCH danych nawet offline.
 
 .DS_Store

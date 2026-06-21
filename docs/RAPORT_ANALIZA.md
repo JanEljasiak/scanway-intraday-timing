@@ -269,10 +269,9 @@ szarych — AUC=1.0. Gdyby idealnie się pokrywały — AUC=0.5.
 ![Krzywa ROC](assets/10_roc_krzywa.svg)
 
 > Czerwona przekątna = losowy (0.5). Niebieska przerywana = orientacyjny
-> kształt dla realnego backtestu (AUC 0.642) — ledwie wybrzusza się nad
-> przekątną, co wizualnie pokazuje „słaby, ale niezerowy” sygnał. Zielona =
-> sesja testowa z §5 (wysokie AUC, bo to czysta sesja ilustracyjna — realne
-> dane są dużo bardziej zaszumione).
+> kształt dla pełnego backtestu (AUC 0.642). Zielona = realna sesja testowa
+> z §5 (AUC ~0.63) — obie ledwie wybrzuszają się nad przekątną, co wizualnie
+> pokazuje „słaby, ale niezerowy i niezaprzeczalny” sygnał.
 
 ---
 
@@ -282,7 +281,7 @@ Backtest (§3–4) mówi *jak dobry jest model statystycznie*, ale nie pokazuje,
 **jak to wygląda w ciągu jednego dnia**. Do tego służy komenda `replay`:
 
 ```bash
-py main.py replay              # ostatnia historyczna sesja (z internetu)
+py main.py replay              # ostatnia historyczna sesja (realne dane)
 py main.py replay --synthetic  # sesja ilustracyjna, działa offline
 ```
 
@@ -295,52 +294,46 @@ widział na treningu** — to uczciwa miniatura tego, co robi walk-forward, tyle
 
 ![Replay sesji](assets/08_replay_sesja.svg)
 
-> Wykres pochodzi z sesji **ilustracyjnej** (`--synthetic`, seed=42) — pokazuje
-> *mechanizm*, nie prawdziwe notowania (środowisko bez internetu). Na Twoim
-> komputerze `py main.py replay` wygeneruje to samo z realnych danych ostatniej
-> historycznej sesji.
+> Wykres pochodzi z **prawdziwej** sesji **2026-06-19** (snapshot realnych
+> danych intraday). Model był trenowany na wszystkich pozostałych sesjach —
+> tej jednej nigdy nie widział (out-of-sample).
 
 ### Jak to czytać
 
 - **Niebieska linia (góra):** cena w trakcie sesji.
-- **Czerwona kropka:** rzeczywisty szczyt dnia (tu: **09:30** — zgodnie z
-  obserwacją z §1.4, że szczyt często wypada rano).
+- **Czerwona kropka:** rzeczywisty szczyt dnia (tu: **10:30**).
 - **Pomarańczowe pasma:** świece, w których *faktycznie* opłacało się sprzedać
-  (`target=1`) — tu skupione w fazie spadku 09:15–12:15.
+  (`target=1`).
 - **Zielone trójkąty / fioletowa linia (dół):** alert modelu, gdy
   prawdopodobieństwo przekracza próg 60% (czerwona linia przerywana).
 
 ### Co ta sesja pokazuje (i czego uczy)
 
-Wynik na tej out-of-sample sesji: **15 alertów, 14 realnych momentów
-sprzedaży, 13 trafień → precyzja 87%, pokrycie 93%, ROC AUC sesji 0.93.**
-Model trzyma wysokie prawdopodobieństwo dokładnie w fazie spadkowej
-(09:00–12:30) i sam je obniża, gdy cena się stabilizuje po południu — to
-właśnie „dobry ranking”, który mierzy ROC AUC (§4.4).
+Wynik na tej out-of-sample sesji: **19 alertów, 24 realne momenty sprzedaży,
+14 trafień → precyzja 74%, pokrycie 58%, ROC AUC sesji 0.634.** ROC AUC tej
+sesji (0.634) jest bardzo blisko AUC z pełnego backtestu (0.642) — czyli ta
+sesja jest reprezentatywna, nie wyjątkowo łatwa ani trudna.
 
 **Wpływ progu alertu na tę sesję** (z `replay`, funkcja `threshold_sweep`):
 
 | Próg | Alertów | Trafione | Precyzja | Pokrycie |
 |---|---|---|---|---|
-| 40% | 21 | 13 | 62% | 93% |
-| 50% | 16 | 13 | 81% | 93% |
-| **60%** | **15** | **13** | **87%** | **93%** |
-| 70% | 12 | 11 | 92% | 79% |
-| 80% | 2 | 1 | 50% | 7% |
+| 40% | 31 | 23 | 74% | 96% |
+| 50% | 27 | 22 | 81% | 92% |
+| **60%** | **19** | **14** | **74%** | **58%** |
+| 70% | 8 | 7 | 88% | 29% |
+| 80% | 2 | 2 | 100% | 8% |
 
 To jest praktyczne tłumaczenie ROC AUC: **jeden model = jeden ranking**, a
-przesuwając próg wybierasz punkt na krzywej ROC. Wyżej (70%) → mniej, ale
-czystszych alertów; niżej (50%) → więcej, kosztem precyzji.
-
-> ⚠️ **Uczciwa uwaga:** ta ilustracyjna sesja ma AUC 0.93, bo jest „czysta”.
-> Realny backtest na 57 zaszumionych sesjach dał AUC **0.642** (§4) — i to jest
-> liczba, której należy ufać. Pojedyncza sesja ma dużą wariancję; służy do
-> *zrozumienia mechanizmu*, nie do oceny skuteczności.
+przesuwając próg wybierasz punkt na krzywej ROC. Wyżej (80%) → garść alertów,
+ale 100% trafnych; niżej (40%) → łapiesz prawie wszystko (96% pokrycia),
+kosztem precyzji. To realna decyzja, którą stroisz przez
+`alert_probability_threshold` w `config.yaml`.
 
 > **Praktyczny wniosek:** narzędzie wskazuje *fazę* „po szczycie, czas
 > rozważyć sprzedaż”, a nie chirurgiczny punkt maksimum. Na realnych danych
 > dochodzi ~15-min opóźnienie yfinance, więc alert na żywo bywa spóźniony o
-> ~15–30 min — warto łączyć go z regułą z EDA (szczyt często ~09:00–09:30).
+> ~15–30 min — warto łączyć go z regułą z EDA (szczyt często rano).
 
 ---
 
@@ -362,13 +355,17 @@ wsadziłby świece z przyszłości do treningu obok testowych z przeszłości
 - tutaj pokazujemy **jeden uczciwy split 80/20** dzień-po-dniu, żeby było
   widać każdą sesję osobno i dało się policzyć, czy to nie przypadek.
 
-### Wynik: każdy dzień testowy osobno
+### Wynik: każdy dzień testowy osobno (realne dane)
+
+Na prawdziwym snapshocie: **46 sesji treningowych, 11 testowych** (sesje
+2026-06-05 … 2026-06-19, których model nie widział).
 
 ![Ocena dzienna](assets/11_ocena_dzienna.svg)
 
-Każdy słupek to ROC AUC jednego dnia testowego. **7 z 8 dni jest powyżej 0.50**
-(linia losowego). Dni bywają różne — to oczekiwane przy małej próbie — ale
-przewaga jest systematyczna, nie pojedynczy „szczęśliwy strzał”.
+Każdy słupek to ROC AUC jednego dnia testowego. **11 z 11 dni jest powyżej
+0.50** (linia losowego). AUC dni waha się od ~0.60 do ~0.93 — przewaga nad
+losowym jest systematyczna na każdej sesji, nie pojedynczy „szczęśliwy
+strzał”.
 
 ### Dowód statystyczny: test permutacyjny (dla laika)
 
@@ -381,10 +378,10 @@ To najważniejszy wykres, jeśli chcesz mieć pewność, że to **nie przypadek*
 2. **1000 razy losowo tasujemy prawdziwe odpowiedzi** (target) i liczymy AUC.
    To symuluje „model, który nic nie umie” — czysty przypadek.
 3. Szary histogram to wyniki tych 1000 losowych prób — kupią się wokół **0.50**
-   (±0.04), bo losowy model z definicji nie odróżnia klas.
-4. **Zielona linia to nasz model (AUC ≈ 0.68)** — leży daleko na prawo od
-   całej chmury losowych wyników.
-5. **p-value ≈ 0.000** oznacza: *żaden* z 1000 losowych modeli nie dorównał
+   (±0.04 na realnych danych), bo losowy model z definicji nie odróżnia klas.
+4. **Zielona linia to nasz model (pooled AUC ≈ 0.67 na realnych danych)** —
+   leży daleko na prawo od całej chmury losowych wyników.
+5. **p-value = 0.0000** oznacza: *żaden* z 1000 losowych modeli nie dorównał
    naszemu. Szansa, że taki wynik to czysty fart, jest praktycznie zerowa.
 
 > 🟢 **To jest właśnie dowód, o który prosiłeś:** model nie jest losowy.
@@ -393,10 +390,11 @@ To najważniejszy wykres, jeśli chcesz mieć pewność, że to **nie przypadek*
 ### Czy to znaczy, że model jest „dobry”?
 
 Nie — znaczy, że jest **niezaprzeczalnie lepszy niż losowy**, ale wciąż
-**słaby w sensie bezwzględnym** (AUC ~0.64–0.68). Dwie rzeczy naraz są
-prawdziwe: *(a)* sygnał istnieje i nie jest przypadkiem, *(b)* jest na tyle
-słaby, że to narzędzie pomocnicze, nie automat do handlu. (Liczby z `evaluate
---synthetic` są ilustracyjne; realny `backtest` dał AUC **0.642**.)
+**słaby w sensie bezwzględnym** (AUC ~0.64–0.67). Dwie rzeczy naraz są
+prawdziwe: *(a)* sygnał istnieje i nie jest przypadkiem (p-value 0.0000,
+11/11 dni powyżej losowego), *(b)* jest na tyle słaby, że to narzędzie
+pomocnicze, nie automat do handlu. Wszystkie liczby tu pochodzą z **realnych**
+danych (snapshot 57 sesji); pełny walk-forward dał AUC **0.642**.
 
 ### Dlaczego wybrałem akurat regresję logistyczną (i co ona właściwie liczy)
 
@@ -425,16 +423,18 @@ prawdopodobieństwo 0–1. Alert pada, gdy to prawdopodobieństwo przekroczy pr�
 
 ![Formuła modelu](assets/13_formula.svg)
 
-Jak to czytać po ludzku (na danych ilustracyjnych):
-- **`rsi_14` (+)** — im wyżej wykupiony rynek, tym większa szansa szczytu
-  (intuicyjne: po silnym wzroście częściej przychodzi spadek).
-- **`minute_of_day` (−)** — im później w sesji, tym mniejsza szansa „szczytu
-  przed spadkiem” (zgadza się z §1.4: szczyt zwykle rano).
-- **`ret_5`, `ret_1` (−)** — świeży spadek zmniejsza szansę dalszego spadku.
+Jak to czytać po ludzku (to **realne** wagi z Twoich danych):
+- **`ret_1` (+)** i **`dist_from_vwap_pct` (+)** — gdy ostatnia świeca rośnie
+  i cena jest wyraźnie nad VWAP (wybicie w górę), rośnie szansa, że to
+  lokalny szczyt przed cofnięciem. Najsilniejsze cechy modelu.
+- **`dist_from_52w_high_pct` (−)** i **`prior_day_ret_pct` (−)** — im dalej
+  od rocznego maksimum / im słabszy był poprzedni dzień, tym mniejsza szansa
+  szczytu teraz (kontekst dzienny tonuje sygnał).
+- **`up_streak` (+)** — dłuższa seria wzrostów dziennych zwiększa szansę
+  zadyszki/cofnięcia.
 
-Na Twoim komputerze `py main.py backtest` (oraz `evaluate`) wypisze **realne**
-wagi z prawdziwych danych — powyższe pochodzą z sesji syntetycznej i służą
-pokazaniu, *jak czytać* tę formułę.
+Te wagi przeliczył `evaluate` na prawdziwych danych; `py main.py backtest`
+wypisze analogiczne dla modelu produkcyjnego (trenowanego na całości).
 
 ---
 

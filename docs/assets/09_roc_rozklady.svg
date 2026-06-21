@@ -2,24 +2,24 @@
 <text x="360.0" y="20.0" font-size="13" text-anchor="middle" fill="#57606a" font-weight="bold">Co mierzy ROC AUC: rozdzielenie wynikow modelu dla obu klas</text>
 <text x="360.0" y="38.0" font-size="9" text-anchor="middle" fill="#57606a" font-weight="normal">AUC = szansa, ze losowy 'moment sprzedazy' dostaje WYZSZY wynik niz losowy 'nie-szczyt'</text>
 <text x="360.0" y="52.0" font-size="9" text-anchor="middle" fill="#57606a" font-weight="normal">Im mniejsze nakladanie sie slupkow, tym wyzszy AUC.</text>
-<rect x="51.0" y="300.0" width="31.5" height="0.0" fill="#afb8c1" opacity="0.9"/>
+<rect x="51.0" y="271.2" width="31.5" height="28.8" fill="#afb8c1" opacity="0.9"/>
 <rect x="82.5" y="300.0" width="31.5" height="0.0" fill="#bc4c00" opacity="0.9"/>
-<rect x="116.0" y="277.0" width="31.5" height="23.0" fill="#afb8c1" opacity="0.9"/>
+<rect x="116.0" y="300.0" width="31.5" height="0.0" fill="#afb8c1" opacity="0.9"/>
 <rect x="147.5" y="300.0" width="31.5" height="0.0" fill="#bc4c00" opacity="0.9"/>
-<rect x="181.0" y="162.0" width="31.5" height="138.0" fill="#afb8c1" opacity="0.9"/>
-<rect x="212.5" y="300.0" width="31.5" height="0.0" fill="#bc4c00" opacity="0.9"/>
-<rect x="246.0" y="208.0" width="31.5" height="92.0" fill="#afb8c1" opacity="0.9"/>
-<rect x="277.5" y="277.0" width="31.5" height="23.0" fill="#bc4c00" opacity="0.9"/>
-<rect x="311.0" y="185.0" width="31.5" height="115.0" fill="#afb8c1" opacity="0.9"/>
-<rect x="342.5" y="300.0" width="31.5" height="0.0" fill="#bc4c00" opacity="0.9"/>
-<rect x="376.0" y="277.0" width="31.5" height="23.0" fill="#afb8c1" opacity="0.9"/>
-<rect x="407.5" y="300.0" width="31.5" height="0.0" fill="#bc4c00" opacity="0.9"/>
-<rect x="441.0" y="277.0" width="31.5" height="23.0" fill="#afb8c1" opacity="0.9"/>
-<rect x="472.5" y="254.0" width="31.5" height="46.0" fill="#bc4c00" opacity="0.9"/>
-<rect x="506.0" y="300.0" width="31.5" height="0.0" fill="#afb8c1" opacity="0.9"/>
-<rect x="537.5" y="70.0" width="31.5" height="230.0" fill="#bc4c00" opacity="0.9"/>
-<rect x="571.0" y="277.0" width="31.5" height="23.0" fill="#afb8c1" opacity="0.9"/>
-<rect x="602.5" y="277.0" width="31.5" height="23.0" fill="#bc4c00" opacity="0.9"/>
+<rect x="181.0" y="300.0" width="31.5" height="0.0" fill="#afb8c1" opacity="0.9"/>
+<rect x="212.5" y="271.2" width="31.5" height="28.8" fill="#bc4c00" opacity="0.9"/>
+<rect x="246.0" y="300.0" width="31.5" height="0.0" fill="#afb8c1" opacity="0.9"/>
+<rect x="277.5" y="300.0" width="31.5" height="0.0" fill="#bc4c00" opacity="0.9"/>
+<rect x="311.0" y="213.8" width="31.5" height="86.2" fill="#afb8c1" opacity="0.9"/>
+<rect x="342.5" y="271.2" width="31.5" height="28.8" fill="#bc4c00" opacity="0.9"/>
+<rect x="376.0" y="300.0" width="31.5" height="0.0" fill="#afb8c1" opacity="0.9"/>
+<rect x="407.5" y="70.0" width="31.5" height="230.0" fill="#bc4c00" opacity="0.9"/>
+<rect x="441.0" y="185.0" width="31.5" height="115.0" fill="#afb8c1" opacity="0.9"/>
+<rect x="472.5" y="98.8" width="31.5" height="201.2" fill="#bc4c00" opacity="0.9"/>
+<rect x="506.0" y="271.2" width="31.5" height="28.8" fill="#afb8c1" opacity="0.9"/>
+<rect x="537.5" y="156.2" width="31.5" height="143.8" fill="#bc4c00" opacity="0.9"/>
+<rect x="571.0" y="300.0" width="31.5" height="0.0" fill="#afb8c1" opacity="0.9"/>
+<rect x="602.5" y="242.5" width="31.5" height="57.5" fill="#bc4c00" opacity="0.9"/>
 <rect x="636.0" y="300.0" width="31.5" height="0.0" fill="#afb8c1" opacity="0.9"/>
 <rect x="667.5" y="300.0" width="31.5" height="0.0" fill="#bc4c00" opacity="0.9"/>
 <line x1="50" y1="300.0" x2="700" y2="300.0" stroke="#8b949e" stroke-width="1"/>

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 340" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
 <text x="360.0" y="18.0" font-size="13" text-anchor="middle" fill="#57606a" font-weight="bold">ROC AUC dla KAZDEGO dnia testowego (split 80/20)</text>
-<text x="360.0" y="36.0" font-size="10" text-anchor="middle" fill="#1a7f37" font-weight="bold">7/8 dni powyzej 0.50 (losowego)</text>
+<text x="360.0" y="36.0" font-size="10" text-anchor="middle" fill="#1a7f37" font-weight="bold">11/11 dni powyzej 0.50 (losowego)</text>
 <line x1="50" y1="290.0" x2="700" y2="290.0" stroke="#d0d7de" stroke-width="1"/>
 <text x="42.0" y="294.0" font-size="9" text-anchor="end" fill="#57606a" font-weight="normal">0.00</text>
 <line x1="50" y1="231.5" x2="700" y2="231.5" stroke="#d0d7de" stroke-width="1"/>
@@ -12,28 +12,37 @@
 <line x1="50" y1="56.0" x2="700" y2="56.0" stroke="#d0d7de" stroke-width="1"/>
 <text x="42.0" y="60.0" font-size="9" text-anchor="end" fill="#57606a" font-weight="normal">1.00</text>
 <text x="700.0" y="169.0" font-size="9" text-anchor="end" fill="#cf222e" font-weight="normal">losowy 0.50</text>
-<rect x="66.2" y="221.8" width="48.8" height="68.2" fill="#cf222e" rx="2"/>
-<text x="90.6" y="216.8" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.29</text>
-<text x="90.6" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 90.6 304.0)">07-15</text>
-<rect x="147.5" y="154.8" width="48.8" height="135.2" fill="#1a7f37" rx="2"/>
-<text x="171.9" y="149.8" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.58</text>
-<text x="171.9" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 171.9 304.0)">07-16</text>
-<rect x="228.8" y="153.7" width="48.8" height="136.3" fill="#1a7f37" rx="2"/>
-<text x="253.1" y="148.7" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.58</text>
-<text x="253.1" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 253.1 304.0)">07-17</text>
-<rect x="310.0" y="82.1" width="48.8" height="207.9" fill="#1a7f37" rx="2"/>
-<text x="334.4" y="77.1" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.89</text>
-<text x="334.4" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 334.4 304.0)">07-20</text>
-<rect x="391.2" y="119.9" width="48.8" height="170.1" fill="#1a7f37" rx="2"/>
-<text x="415.6" y="114.9" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.73</text>
-<text x="415.6" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 415.6 304.0)">07-21</text>
-<rect x="472.5" y="157.2" width="48.8" height="132.8" fill="#1a7f37" rx="2"/>
-<text x="496.9" y="152.2" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.57</text>
-<text x="496.9" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 496.9 304.0)">07-22</text>
-<rect x="553.8" y="69.2" width="48.8" height="220.8" fill="#1a7f37" rx="2"/>
-<text x="578.1" y="64.2" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.94</text>
-<text x="578.1" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 578.1 304.0)">07-23</text>
-<rect x="635.0" y="75.4" width="48.8" height="214.6" fill="#1a7f37" rx="2"/>
-<text x="659.4" y="70.4" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.92</text>
-<text x="659.4" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 659.4 304.0)">07-24</text>
+<rect x="61.8" y="100.4" width="35.5" height="189.6" fill="#1a7f37" rx="2"/>
+<text x="79.5" y="95.4" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.81</text>
+<text x="79.5" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 79.5 304.0)">06-05</text>
+<rect x="120.9" y="150.6" width="35.5" height="139.4" fill="#1a7f37" rx="2"/>
+<text x="138.6" y="145.6" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.60</text>
+<text x="138.6" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 138.6 304.0)">06-08</text>
+<rect x="180.0" y="114.5" width="35.5" height="175.5" fill="#1a7f37" rx="2"/>
+<text x="197.7" y="109.5" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.75</text>
+<text x="197.7" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 197.7 304.0)">06-09</text>
+<rect x="239.1" y="121.2" width="35.5" height="168.8" fill="#1a7f37" rx="2"/>
+<text x="256.8" y="116.2" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.72</text>
+<text x="256.8" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 256.8 304.0)">06-10</text>
+<rect x="298.2" y="121.6" width="35.5" height="168.4" fill="#1a7f37" rx="2"/>
+<text x="315.9" y="116.6" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.72</text>
+<text x="315.9" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 315.9 304.0)">06-11</text>
+<rect x="357.3" y="88.3" width="35.5" height="201.7" fill="#1a7f37" rx="2"/>
+<text x="375.0" y="83.3" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.86</text>
+<text x="375.0" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 375.0 304.0)">06-12</text>
+<rect x="416.4" y="71.9" width="35.5" height="218.1" fill="#1a7f37" rx="2"/>
+<text x="434.1" y="66.9" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.93</text>
+<text x="434.1" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 434.1 304.0)">06-15</text>
+<rect x="475.5" y="112.8" width="35.5" height="177.2" fill="#1a7f37" rx="2"/>
+<text x="493.2" y="107.8" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.76</text>
+<text x="493.2" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 493.2 304.0)">06-16</text>
+<rect x="534.5" y="114.5" width="35.5" height="175.5" fill="#1a7f37" rx="2"/>
+<text x="552.3" y="109.5" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.75</text>
+<text x="552.3" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 552.3 304.0)">06-17</text>
+<rect x="593.6" y="129.7" width="35.5" height="160.3" fill="#1a7f37" rx="2"/>
+<text x="611.4" y="124.7" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.69</text>
+<text x="611.4" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 611.4 304.0)">06-18</text>
+<rect x="652.7" y="134.0" width="35.5" height="156.0" fill="#1a7f37" rx="2"/>
+<text x="670.5" y="129.0" font-size="8" text-anchor="middle" fill="#57606a" font-weight="normal">0.67</text>
+<text x="670.5" y="304.0" font-size="8" text-anchor="end" fill="#57606a" transform="rotate(-45 670.5 304.0)">06-19</text>
 </svg>

@@ -18,11 +18,13 @@ Uruchomienie:  py tools/make_report_charts.py
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))  # by importowac pakiet src.* w generatorach wykresow
 ASSETS = ROOT / "docs" / "assets"
 ASSETS.mkdir(parents=True, exist_ok=True)
 
@@ -348,27 +350,49 @@ def chart_intervals():
 # ----------------------------------------------------------------------------
 # 8. REPLAY: odtworzenie sesji - cena + alerty + ground truth (2 panele)
 # ----------------------------------------------------------------------------
-def _compute_replay():
-    """Liczy replay out-of-sample na tej samej syntetycznej sesji co
-    `replay --synthetic` (seed=42), zeby wykresy w raporcie zgadzaly sie z
-    wynikiem komendy. Zwraca DataFrame rep."""
+def _load_real_or_synthetic():
+    """Zwraca (intraday_df, daily_ctx, cfg, is_real, etykieta_zrodla).
+
+    Preferuje PRAWDZIWE dane intraday (snapshot/live przez yfinance). Tylko gdy
+    realnych danych brak (np. swiezy klon bez snapshotu i bez internetu),
+    spada na sesje syntetyczna - wtedy wykresy oznaczamy jako ilustracyjne.
+    """
     import sys
     sys.path.insert(0, str(ROOT))
     from src.config import load_config
-    from src.features import build_features
-    from src.replay import make_synthetic_session, replay_session, train_excluding_session
+    from src.data_sources import get_daily_history
+    from src.features import build_daily_context_features
+    from src.replay import load_intraday_for_replay, make_synthetic_session
 
     cfg = load_config()
-    intraday = make_synthetic_session(cfg, n_sessions=40, seed=42)
-    feat_df, cols = build_features(intraday, None, cfg)
+    try:
+        intraday, source = load_intraday_for_replay(cfg, synthetic=False)
+        if intraday.empty:
+            raise ValueError("pusto")
+        daily = get_daily_history(cfg, refresh_live=False)
+        daily_ctx = build_daily_context_features(daily)
+        return intraday, daily_ctx, cfg, True, source
+    except Exception as e:
+        print(f"  [uwaga] brak realnych danych intraday ({e}); uzywam syntetycznych")
+        return make_synthetic_session(cfg, n_sessions=40, seed=42), None, cfg, False, "syntetyczne"
+
+
+def _compute_replay():
+    """Liczy replay out-of-sample na realnej (lub awaryjnie syntetycznej)
+    ostatniej sesji, tak jak komenda `replay`. Zwraca (rep, cfg, is_real)."""
+    from src.features import build_features
+    from src.replay import replay_session, train_excluding_session
+
+    intraday, daily_ctx, cfg, is_real, _ = _load_real_or_synthetic()
+    feat_df, cols = build_features(intraday, daily_ctx, cfg)
     holdout = sorted(feat_df["date"].unique())[-1]
     model, _, _ = train_excluding_session(feat_df, cols, cfg, "logistic_regression", holdout)
-    rep = replay_session(intraday, None, cfg, model, cols, session_date=holdout)
-    return rep, cfg
+    rep = replay_session(intraday, daily_ctx, cfg, model, cols, session_date=holdout)
+    return rep, cfg, is_real, holdout
 
 
 def chart_replay():
-    rep, cfg = _compute_replay()
+    rep, cfg, is_real, holdout = _compute_replay()
     n = len(rep)
     W, H = 860, 460
     ml, mr = 55, 20
@@ -390,8 +414,9 @@ def chart_replay():
     p = _svg_open(W, H)
     p.append(_text(W / 2, 20, "Replay sesji: gdzie model wysyla ALERT vs realne szczyty",
                    14, "middle", C_TEXT, "bold"))
-    p.append(_text(W / 2, 36, "sesja ILUSTRACYJNA (syntetyczna, seed=42) - pokazuje mechanizm, nie realne notowania",
-                   9, "middle", C_RED))
+    sub = (f"PRAWDZIWA sesja {holdout} (out-of-sample) - model jej nie widzial na treningu"
+           if is_real else "sesja ILUSTRACYJNA (syntetyczna) - brak realnych danych")
+    p.append(_text(W / 2, 36, sub, 9, "middle", (C_TEXT if is_real else C_RED)))
 
     # --- panel 1: cena ---
     p.append(_text(ml, p1t - 6, "Cena (PLN)", 10, "start", C_TEXT, "bold"))
@@ -454,7 +479,7 @@ def chart_replay():
 # 9. CO MIERZY ROC AUC: rozklad wynikow modelu dla obu klas (na sesji testowej)
 # ----------------------------------------------------------------------------
 def chart_roc_distributions():
-    rep, cfg = _compute_replay()
+    rep, cfg, is_real, holdout = _compute_replay()
     pos = rep.loc[rep["target"] == 1, "proba"].values  # realne momenty sprzedazy
     neg = rep.loc[rep["target"] == 0, "proba"].values  # reszta
 
@@ -503,7 +528,7 @@ def chart_roc_distributions():
 # ----------------------------------------------------------------------------
 def chart_roc_curve():
     from sklearn.metrics import roc_auc_score, roc_curve
-    rep, cfg = _compute_replay()
+    rep, cfg, is_real, holdout = _compute_replay()
     fpr, tpr, _ = roc_curve(rep["target"], rep["proba"])
     auc_sess = roc_auc_score(rep["target"], rep["proba"])
 
@@ -546,28 +571,23 @@ def chart_roc_curve():
 
 
 def _compute_evaluation():
-    """Liczy ocene dzien-po-dniu na tych samych danych co `evaluate --synthetic`
-    (seed=42, split 80/20), zeby wykresy zgadzaly sie z wynikiem komendy."""
-    import sys
-    sys.path.insert(0, str(ROOT))
-    from src.config import load_config
+    """Liczy ocene dzien-po-dniu na realnych (lub awaryjnie syntetycznych)
+    danych, split 80/20, tak jak komenda `evaluate`."""
     from src.evaluate import daywise_evaluation, logistic_formula
     from src.features import build_features
-    from src.replay import make_synthetic_session
 
-    cfg = load_config()
-    intraday = make_synthetic_session(cfg, n_sessions=40, seed=42)
-    feat_df, cols = build_features(intraday, None, cfg)
+    intraday, daily_ctx, cfg, is_real, _ = _load_real_or_synthetic()
+    feat_df, cols = build_features(intraday, daily_ctx, cfg)
     per_day, pooled, model = daywise_evaluation(feat_df, cols, cfg, "logistic_regression", 0.8)
     fml = logistic_formula(model, cols)
-    return per_day, pooled, fml
+    return per_day, pooled, fml, is_real
 
 
 # ----------------------------------------------------------------------------
 # 11. OCENA DZIEN-PO-DNIU: ROC AUC kazdego dnia testowego vs linia 0.5
 # ----------------------------------------------------------------------------
 def chart_daywise_auc():
-    per_day, pooled, _ = _compute_evaluation()
+    per_day, pooled, _, is_real = _compute_evaluation()
     aucs = per_day["auc"].fillna(0.5).tolist()
     labels = [str(d)[5:] for d in per_day["date"]]  # MM-DD
 
@@ -608,7 +628,7 @@ def chart_daywise_auc():
 # ----------------------------------------------------------------------------
 def chart_permutation():
     import numpy as np
-    _, pooled, _ = _compute_evaluation()
+    _, pooled, _, is_real = _compute_evaluation()
     null = pooled["perm_null"]
     obs = pooled["pooled_auc"]
 
@@ -654,7 +674,7 @@ def chart_permutation():
 # 13. FORMULA: wagi (wspolczynniki) regresji logistycznej
 # ----------------------------------------------------------------------------
 def chart_formula():
-    _, _, fml = _compute_evaluation()
+    _, _, fml, is_real = _compute_evaluation()
     terms = fml["terms"]
     feats = terms["feature"].tolist()
     coefs = terms["coef_std"].tolist()
