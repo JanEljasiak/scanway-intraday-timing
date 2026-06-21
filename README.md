@@ -4,6 +4,9 @@ Narzedzie do analizy sezonowosci sroddziennej i sygnalizowania
 prawdopodobnych "lokalnych szczytow" ceny akcji Scanway SA (GPW: SCW)
 w ciagu sesji gieldowej.
 
+> 📊 **[Raport analityczny (EDA + dobor modelu, z wykresami)](docs/RAPORT_ANALIZA.md)**
+> - wizualne podsumowanie danych, inzynierii cech i porownania modeli.
+
 ## ⚠️ Disclaimer
 
 To narzedzie analityczne, **nie system gwarantujacy zysk i nie porada

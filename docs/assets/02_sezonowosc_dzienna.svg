@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 320" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<text x="280.0" y="18.0" font-size="13" text-anchor="middle" fill="#57606a" font-weight="bold">Sredni zwrot dzienny wg dnia tygodnia (669 sesji)</text>
+<line x1="50" y1="284.0" x2="540" y2="284.0" stroke="#8b949e" stroke-width="1.5"/>
+<line x1="50" y1="201.3" x2="540" y2="201.3" stroke="#d0d7de" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="42.0" y="205.3" font-size="10" text-anchor="end" fill="#57606a" font-weight="normal">0.2%</text>
+<line x1="50" y1="118.7" x2="540" y2="118.7" stroke="#d0d7de" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="42.0" y="122.7" font-size="10" text-anchor="end" fill="#57606a" font-weight="normal">0.4%</text>
+<line x1="50" y1="36.0" x2="540" y2="36.0" stroke="#d0d7de" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="42.0" y="40.0" font-size="10" text-anchor="end" fill="#57606a" font-weight="normal">0.6%</text>
+<rect x="69.6" y="109.4" width="58.8" height="174.6" fill="#0969da" rx="2"/>
+<text x="99.0" y="103.4" font-size="10" text-anchor="middle" fill="#57606a" font-weight="bold">0.42</text>
+<text x="99.0" y="306.0" font-size="11" text-anchor="middle" fill="#57606a" font-weight="normal">Pon</text>
+<rect x="167.6" y="266.2" width="58.8" height="17.8" fill="#0969da" rx="2"/>
+<text x="197.0" y="260.2" font-size="10" text-anchor="middle" fill="#57606a" font-weight="bold">0.04</text>
+<text x="197.0" y="306.0" font-size="11" text-anchor="middle" fill="#57606a" font-weight="normal">Wt</text>
+<rect x="265.6" y="152.8" width="58.8" height="131.2" fill="#0969da" rx="2"/>
+<text x="295.0" y="146.8" font-size="10" text-anchor="middle" fill="#57606a" font-weight="bold">0.32</text>
+<text x="295.0" y="306.0" font-size="11" text-anchor="middle" fill="#57606a" font-weight="normal">Sr</text>
+<rect x="363.6" y="109.7" width="58.8" height="174.3" fill="#0969da" rx="2"/>
+<text x="393.0" y="103.7" font-size="10" text-anchor="middle" fill="#57606a" font-weight="bold">0.42</text>
+<text x="393.0" y="306.0" font-size="11" text-anchor="middle" fill="#57606a" font-weight="normal">Czw</text>
+<rect x="461.6" y="59.4" width="58.8" height="224.6" fill="#1a7f37" rx="2"/>
+<text x="491.0" y="53.4" font-size="10" text-anchor="middle" fill="#57606a" font-weight="bold">0.54</text>
+<text x="491.0" y="306.0" font-size="11" text-anchor="middle" fill="#57606a" font-weight="normal">Pt</text>
+</svg>
