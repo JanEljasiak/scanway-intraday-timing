@@ -1,11 +1,13 @@
 # SCW (Scanway SA) - intraday timing toolkit
 
-Narzedzie do analizy sezonowosci sroddziennej i sygnalizowania
-prawdopodobnych "lokalnych szczytow" ceny akcji Scanway SA (GPW: SCW)
-w ciagu sesji gieldowej.
+Narzedzie, ktore wysyla **jeden sygnal dziennie w momencie DZIENNEGO MAKSIMUM**
+ceny akcji Scanway SA (GPW: SCW) - zeby pomoc trafic z momentem sprzedazy.
+Model docelowy to tryb `peak` (`py main.py peak`). Wczesniejsze ujecie
+"lokalnych szczytow" (wiele sygnalow dziennie) jest zachowane jako analiza
+pomocnicza (`backtest`/`replay`/`evaluate`).
 
-> 📊 **[Raport analityczny (EDA + dobor modelu, z wykresami)](docs/RAPORT_ANALIZA.md)**
-> - wizualne podsumowanie danych, inzynierii cech i porownania modeli.
+> 📊 **[Raport analityczny (EDA + model dziennego maksimum, z wykresami)](docs/RAPORT_ANALIZA.md)**
+> - wizualne podsumowanie danych, cech, funkcji straty i wynikow.
 
 ## ⚠️ Disclaimer
 

@@ -674,13 +674,22 @@ def chart_permutation():
 # 13. FORMULA: wagi (wspolczynniki) regresji logistycznej
 # ----------------------------------------------------------------------------
 def chart_formula():
-    _, _, fml, is_real = _compute_evaluation()
-    terms = fml["terms"]
+    # wspolczynniki MODELU PEAK (dzienne maksimum) - trenowany na calym zbiorze
+    from src.features import build_features
+    from src.peak import add_daily_high_target, train_peak_model
+    intraday, daily_ctx, cfg, is_real, _ = _load_real_or_synthetic()
+    feat_df, cols = build_features(intraday, daily_ctx, cfg)
+    feat_df = add_daily_high_target(feat_df)
+    model = train_peak_model(feat_df, cols, cfg)
+    clf = model.named_steps["clf"]
+    import pandas as pd
+    terms = pd.DataFrame({"feature": cols, "coef_std": clf.coef_.ravel()}) \
+        .sort_values("coef_std", key=abs, ascending=False).reset_index(drop=True)
     feats = terms["feature"].tolist()
     coefs = terms["coef_std"].tolist()
 
     W, H = 720, 300
-    ml, mr, mt, mb = 150, 80, 50, 20
+    ml, mr, mt, mb = 160, 80, 50, 20
     pw, ph = W - ml - mr, H - mt - mb
     rowh = ph / len(feats)
     barh = rowh * 0.55
@@ -690,7 +699,7 @@ def chart_formula():
     def X(v): return x0 + (pw / 2) * v / amax
 
     p = _svg_open(W, H)
-    p.append(_text(W / 2, 18, "Formula modelu: wplyw cech na p(szczyt)",
+    p.append(_text(W / 2, 18, "Formula modelu PEAK: wplyw cech na p(dzienne maksimum)",
                    13, "middle", C_TEXT, "bold"))
     p.append(_text(W / 2, 36, "waga + (zielona) podnosi prawd. szczytu, - (czerwona) obniza; dlugosc = sila",
                    9, "middle", C_TEXT))
