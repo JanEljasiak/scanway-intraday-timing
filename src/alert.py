@@ -1,7 +1,5 @@
 """
-Wysylka alertow + petla live. Domyslnie alert trafia tylko do konsoli;
-jesli w .env ustawione sa TELEGRAM_BOT_TOKEN i TELEGRAM_CHAT_ID, wyslemy
-tez wiadomosc na Telegrama.
+Wysylka alertow + petla live. Alert trafia do konsoli.
 
 WAZNE OGRANICZENIE: yfinance ma opoznienie danych (typowo ~15 min, dla
 malo plynnych spolek GPW czasem wiecej). W polaczeniu z odpytywaniem co
@@ -16,7 +14,6 @@ from datetime import datetime, time as dtime
 
 import joblib
 import pandas as pd
-import requests
 
 from .config import Config
 from .data_sources import fetch_intraday_yf, get_daily_history
@@ -27,19 +24,8 @@ def send_console(message: str) -> None:
     print(f"[ALERT {datetime.now():%Y-%m-%d %H:%M:%S}] {message}")
 
 
-def send_telegram(message: str, cfg: Config) -> None:
-    if not cfg.telegram_bot_token or not cfg.telegram_chat_id:
-        return
-    url = f"https://api.telegram.org/bot{cfg.telegram_bot_token}/sendMessage"
-    try:
-        requests.post(url, data={"chat_id": cfg.telegram_chat_id, "text": message}, timeout=10)
-    except Exception as e:
-        print(f"[alert] Nie udalo sie wyslac na Telegrama: {e}")
-
-
 def send_alert(message: str, cfg: Config) -> None:
     send_console(message)
-    send_telegram(message, cfg)
 
 
 def load_trained_model(cfg: Config):

@@ -25,22 +25,28 @@ inwestycyjna**:
 
 ```
 scanway-intraday-timing/
-├── main.py                  # CLI: update-data / backtest / live
-├── config.yaml               # wszystkie parametry (ticker, progi, itp.)
-├── .env.example               # szablon na dane do alertow (Telegram)
+├── main.py                  # CLI: update-data / backtest / replay / evaluate / peak / live
+├── config.yaml               # wszystkie parametry (ticker, progi, kara, itp.)
 ├── requirements.txt
 ├── data/
-│   └── scw_d.csv               # historia dzienna od debiutu (2023-10-11)
+│   ├── scw_d.csv               # historia dzienna od debiutu (2023-10-11)
+│   └── intraday_snapshot.csv   # realny snapshot intraday (~57 sesji)
 ├── models/                      # tu trafia wytrenowany model (po backtest)
 ├── src/
-│   ├── config.py                 # wczytywanie config.yaml + .env
+│   ├── config.py                 # wczytywanie config.yaml
 │   ├── data_sources.py           # Stooq (dzienne) + yfinance (intraday live)
-│   ├── features.py               # inzynieria cech + sezonowosc
+│   ├── features.py               # inzynieria cech + sezonowosc + target
 │   ├── models.py                 # kandydaci ML do porownania
 │   ├── backtest.py               # walk-forward walidacja + zapis najlepszego modelu
-│   └── alert.py                  # wysylka alertow + petla live
-└── tests/
-    └── test_features.py         # testy offline (dzialaja bez internetu)
+│   ├── replay.py                 # odtworzenie jednej sesji swieca-po-swiecy
+│   ├── evaluate.py               # ocena dzien-po-dniu + test 'lepiej niz losowo'
+│   ├── peak.py                   # tryb 'jeden szczyt dziennie' + asymetryczna kara
+│   └── alert.py                  # alert do konsoli + petla live
+├── tools/
+│   └── make_report_charts.py    # generator wykresow SVG do raportu
+├── docs/
+│   └── RAPORT_ANALIZA.md         # raport analityczny z wykresami
+└── tests/                        # testy offline (dzialaja bez internetu)
 ```
 
 ## Instalacja na nowym komputerze
@@ -53,8 +59,6 @@ py -m venv venv
 source venv/Scripts/activate    # Windows (Git Bash); cmd: venv\Scripts\activate
 
 pip install -r requirements.txt
-
-cp .env.example .env            # opcjonalnie - jesli chcesz alerty na Telegram
 ```
 
 Sprawdz, czy wszystko dziala (bez internetu, testuje tylko dane lokalne):
@@ -145,11 +149,27 @@ py main.py peak --synthetic     # offline
 
 W przeciwienstwie do `backtest`/`evaluate` (wiele lokalnych sygnalow), tryb
 `peak` celuje w DZIENNE MAKSIMUM: target to 1 swieca/sesje (najwyzszy Close),
-a model ma ASYMETRYCZNA kare - przegapienie szczytu (false negative) karane
-`daily_high_fn_penalty`x mocniej niz falszywy alarm (`config.yaml`). Decyzja:
-max 1 alert dziennie. Pokazuje, jak blisko dziennego szczytu sprzedajesz
-(regret %) vs proste strategie, z testem permutacyjnym. Omowienie: sekcja 7 w
+a model ma ASYMETRYCZNA kare. Decyzja: max 1 alert dziennie. Pokazuje, jak
+blisko dziennego szczytu sprzedajesz (regret %) vs proste strategie, z testem
+permutacyjnym. Omowienie: sekcja 7 w
 [docs/RAPORT_ANALIZA.md](docs/RAPORT_ANALIZA.md).
+
+**Jak liczona jest funkcja straty (szukanie dziennego maksimum).** Model
+minimalizuje wazona entropie krzyzowa (weighted log-loss):
+
+```
+L = -(1/N) * SUMA_i  w[y_i] * [ y_i*log(p_i) + (1-y_i)*log(1-p_i) ]
+    w[1] = daily_high_fn_penalty   (klasa "szczyt")
+    w[0] = 1                       (klasa "nie-szczyt")
+```
+
+Przegapienie prawdziwego szczytu (y=1, male p) jest mnozone przez
+`daily_high_fn_penalty`, wiec kosztuje tyle razy wiecej niz falszywy alarm
+(kod: `class_weight={0:1, 1:penalty}` w `src/peak.py`). Weryfikujemy to
+trzema niezaleznymi testami out-of-sample: (1) **regret** = sredni % ponizej
+dziennego szczytu, (2) **test permutacyjny** (p-value vs losowy wybor swiecy),
+(3) **sweep kary** (wieksza kara => mniej przegapien). Wszystkie na realnych
+danych w sekcji 7 raportu.
 
 ### 6. Uruchom alert live
 
@@ -159,8 +179,8 @@ py main.py live
 
 W godzinach sesji GPW (domyslnie 9:00-17:00) odpytuje rynek co 15 minut,
 liczy prawdopodobienstwo "lokalnego szczytu" wytrenowanym modelem i
-wysyla alert (konsola + Telegram, jesli skonfigurowany w `.env`), gdy
-przekroczy prog z `config.yaml` (`alert_probability_threshold`).
+wypisuje alert w konsoli, gdy przekroczy prog z `config.yaml`
+(`alert_probability_threshold`).
 
 ## Konfiguracja (`config.yaml`)
 
@@ -168,17 +188,12 @@ Najwazniejsze parametry:
 
 | Klucz | Znaczenie |
 |---|---|
-| `sell_horizon_bars` | ile 15-min swiec do przodu definiuje "niedaleka przyszlosc" |
+| `sell_horizon_bars` | ile 15-min swiec do przodu definiuje "niedaleka przyszlosc" (tryb local_top) |
 | `sell_target_drop_pct` | jaki spadek % w tym oknie liczymy jako "tu warto bylo sprzedac" |
+| `daily_high_fn_penalty` | tryb `peak`: ile razy mocniej karzemy przegapienie dziennego szczytu |
+| `peak_tolerance_bars` | tryb `peak`: tolerancja (w swiecach) uznania alertu za trafiony |
 | `alert_probability_threshold` | od jakiego prawdopodobienstwa wysylamy alert |
 | `walk_forward_splits` | liczba okien w walidacji chronologicznej |
-
-## Alerty na Telegramie (opcjonalnie)
-
-1. Utworz bota przez [@BotFather](https://t.me/BotFather), skopiuj token.
-2. Wyslij dowolna wiadomosc do bota, potem otworz w przegladarce:
-   `https://api.telegram.org/bot<TWOJ_TOKEN>/getUpdates` i odczytaj `chat_id`.
-3. Wpisz oba do `.env`.
 
 ## Aktualizacja danych historycznych
 

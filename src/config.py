@@ -1,14 +1,12 @@
 """
-Wczytywanie konfiguracji projektu: config.yaml + zmienne srodowiskowe (.env).
+Wczytywanie konfiguracji projektu z config.yaml.
 """
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
-from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -32,9 +30,6 @@ class Config:
     timezone: str
     random_state: int
 
-    telegram_bot_token: str = field(default="")
-    telegram_chat_id: str = field(default="")
-
     @property
     def local_daily_csv_path(self) -> Path:
         return PROJECT_ROOT / self.local_daily_csv
@@ -47,8 +42,6 @@ class Config:
 
 
 def load_config(path: str | Path = None) -> Config:
-    load_dotenv(PROJECT_ROOT / ".env")  # nie wywali bledu jesli pliku brak
-
     path = Path(path) if path else PROJECT_ROOT / "config.yaml"
     with open(path, "r", encoding="utf-8") as f:
         raw = yaml.safe_load(f)
@@ -70,6 +63,4 @@ def load_config(path: str | Path = None) -> Config:
         market_close=raw["market_close"],
         timezone=raw["timezone"],
         random_state=int(raw["random_state"]),
-        telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
-        telegram_chat_id=os.getenv("TELEGRAM_CHAT_ID", ""),
     )

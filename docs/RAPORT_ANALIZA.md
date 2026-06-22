@@ -460,13 +460,39 @@ py main.py peak --synthetic    # offline
 | Funkcja straty | symetryczna (`balanced`) | **asymetryczna** — przegapienie szczytu karane `daily_high_fn_penalty`× mocniej |
 | Brak alertu | — | dozwolony, ale karany (trzymasz do zamknięcia) |
 
-### Funkcja straty: większa kara za przegapienie szczytu
+### Jak dokładnie liczona jest funkcja straty (i jak ją weryfikujemy)
 
-Zgodnie z Twoją prośbą, błąd „przegapiłem szczyt” (false negative) kosztuje
-model **wielokrotnie więcej** niż fałszywy alarm. Realizujemy to przez wagi
-klas w regresji logistycznej: `class_weight = {0: 1, 1: penalty}`. Im wyższa
-`penalty` (w `config.yaml`: `daily_high_fn_penalty`), tym agresywniej model
-szuka szczytu. Widać to wprost:
+Model (regresja logistyczna) minimalizuje **ważoną entropię krzyżową**
+(weighted log-loss). Dla każdej świecy `i` z etykietą `yᵢ ∈ {0,1}`
+(`1` = świeca będąca dziennym maksimum) i przewidywanym prawdopodobieństwem
+`pᵢ` strata to:
+
+```
+L = − (1/N) · Σᵢ  wᵧᵢ · [ yᵢ · log(pᵢ) + (1 − yᵢ) · log(1 − pᵢ) ]
+
+gdzie:   w₁ = daily_high_fn_penalty   (waga klasy "szczyt")
+         w₀ = 1                       (waga klasy "nie-szczyt")
+```
+
+Sedno jest w `w₁`: błąd na **prawdziwym szczycie** (czyli przegapienie:
+`yᵢ=1`, ale `pᵢ` małe → `log(pᵢ)` mocno ujemny) jest mnożony przez
+`daily_high_fn_penalty`, więc kosztuje `penalty` razy więcej niż fałszywy
+alarm. To dokładnie realizuje „większą karę za nieprzewidzenie alertu”.
+W kodzie: `class_weight = {0: 1, 1: penalty}` w
+[`src/peak.py`](../src/peak.py) (`train_peak_model`).
+
+**Jak weryfikujemy, że ta strata faktycznie znajduje dzienne maksimum** — trzy
+niezależne sprawdziany (wszystkie out-of-sample, na realnych danych):
+
+1. **Regret** = średni % poniżej dziennego maksimum, po jakim sprzedajesz
+   idąc za alertem. Bezpośrednio mierzy „jak blisko górki” (wykres niżej).
+2. **Test permutacyjny** — tasujemy przypisanie prawdopodobieństw do świec;
+   jeśli strata naprawdę uczy modelu szczytu, regret losowego wyboru musi być
+   istotnie gorszy (p-value).
+3. **Sweep kary** — zmieniamy `penalty` i patrzymy, czy zgodnie z teorią
+   większa kara → mniej przegapień (wyższy odsetek trafień, niższy regret).
+
+Wykres sweep:
 
 ![Wpływ kary](assets/16_peak_kara.svg)
 
