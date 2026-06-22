@@ -9,8 +9,7 @@
 > (3) **model dziennego maksimum** (target + funkcja straty + decyzja),
 > (4) **wyniki modelu** (jak blisko górki sprzedajesz + dowody),
 > (5) dlaczego regresja logistyczna i czym jest ROC AUC,
-> (6) analiza pomocnicza „lokalnych szczytów” (`backtest`/`replay`/`evaluate`),
-> (7) ograniczenia i następne kroki.
+> (6) ograniczenia i następne kroki.
 >
 > Wszystkie wykresy generuje [`tools/make_report_charts.py`](../tools/make_report_charts.py)
 > z prawdziwych danych (snapshot `data/intraday_snapshot.csv`, 57 sesji);
@@ -18,9 +17,9 @@
 
 > ℹ️ **Uwaga o historii projektu.** Pierwotnie model szukał *każdego* lokalnego
 > momentu sprzedaży (wiele sygnałów dziennie, `target_local_top`). Zostało to
-> **zmienione**: teraz celem jest **dzienne maksimum** (jeden sygnał). Analiza
-> lokalnych szczytów (sekcja 6) została zachowana, bo uzasadniła wybór cech i
-> rodziny modelu, a komendy `backtest`/`replay`/`evaluate` nadal działają.
+> **zmienione**: teraz celem jest **dzienne maksimum** (jeden sygnał). Dawne
+> ujęcie żyje jeszcze w komendach pomocniczych `backtest`/`replay`/`evaluate`,
+> które uzasadniły wybór cech i rodziny modelu — ale nie jest celem projektu.
 
 ---
 
@@ -140,7 +139,7 @@ py main.py peak --synthetic    # offline (gdy brak danych intraday)
 reszty. Na naszych danych to **57 jedynek na 57 sesji** — dokładnie jeden
 „dobry moment na sprzedaż” dziennie (osiągalny najlepszy kurs na zamknięciu
 świecy). To zupełnie inny target niż wcześniejszy „lokalny szczyt” (wiele
-jedynek dziennie, §6).
+jedynek dziennie, ujęcie pomocnicze).
 
 Klasy są **silnie niezbalansowane**: ~**3%** świec to szczyt (1 z ~33), ~97% to
 nie-szczyt. To wymusza specjalną funkcję straty (niżej).
@@ -260,7 +259,7 @@ przypadek** — to nie jest szczęśliwy traf.
 ### 5.1 Wybór rodziny modelu (porównanie na zadaniu pomocniczym)
 
 Rodzinę modelu wybraliśmy, porównując 7 kandydatów walidacją chronologiczną
-(walk-forward) na zadaniu „lokalnych szczytów” (§6). Kryterium = **ROC AUC**
+(walk-forward) na pomocniczym zadaniu klasyfikacji świec. Kryterium = **ROC AUC**
 (nie F1, bo przy niezbalansowanych klasach F1 faworyzuje model, który zawsze
 typuje klasę większościową):
 
@@ -296,41 +295,7 @@ klas, tym wyższy AUC; krzywa ROC im wyżej-lewiej, tym lepiej.
 
 ---
 
-## 6. Analiza pomocnicza: „lokalne szczyty” (`backtest`/`replay`/`evaluate`)
-
-> To **wcześniejsze** ujęcie: target `target_local_top` = dla każdej świecy
-> „czy w ciągu 4 świec cena spadnie o ≥0.5%”, czyli **wiele** sygnałów dziennie.
-> Zostało zastąpione trybem peak (§3–4), ale komendy działają i dostarczyły
-> dowodu, że w danych jest realny sygnał.
-
-Definicja targetu (`src/features.py`): `target=1`, jeśli
-`(Close[t] − min(Low[t+1..t+4])) / Close[t] > 0.5%`. Klasy ~77%/23%.
-
-### 6.1 Replay jednej sesji świeca-po-świecy (out-of-sample)
-
-![Replay sesji](assets/08_replay_sesja.svg)
-
-Prawdziwa sesja **2026-06-19** (model trenowany bez niej): 19 alertów, 24 realne
-momenty sprzedaży, 14 trafień → precyzja 74%, pokrycie 58%, ROC AUC sesji 0.634
-(blisko backtestu 0.642 → sesja reprezentatywna).
-
-### 6.2 Ocena dzień-po-dniu + dowód „lepiej niż losowo”
-
-![Ocena dzienna](assets/11_ocena_dzienna.svg)
-![Test permutacyjny](assets/12_permutacja.svg)
-
-Split 80/20, 11 sesji testowych: **11 z 11 dni ma ROC AUC > 0.5**, pooled AUC
-**0.670**, a test permutacyjny (1000 modeli z przetasowanymi etykietami) daje
-**p-value 0.0000**. To formalny dowód, że sygnał w danych istnieje i nie jest
-przypadkiem — co uzasadniło zbudowanie modelu dziennego maksimum.
-
-> **Uczciwa kalibracja oczekiwań:** AUC ~0.64–0.67 to sygnał **słaby w sensie
-> bezwzględnym** (lekko lepszy niż rzut monetą). Istnieje i jest istotny
-> statystycznie, ale to narzędzie pomocnicze, nie automat do handlu.
-
----
-
-## 7. Ograniczenia i następne kroki
+## 6. Ograniczenia i następne kroki
 
 **Ograniczenia (wszystkie realne):**
 - tylko **57 przykładów szczytu** (1/sesję) — mała próba, duża wariancja;

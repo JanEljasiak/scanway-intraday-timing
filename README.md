@@ -6,6 +6,7 @@ szczyt dnia — sprzedaj**” dla akcji Scanway SA (SCW.WA). Dostajesz jeden ale
 
 > 📊 **[Jak to działa — back-end krok po kroku (z wizualizacjami)](docs/JAK_DZIALA.md)**
 > · 📈 **[Pełny raport analityczny](docs/RAPORT_ANALIZA.md)**
+> · 📓 **[Notebook (Jupyter) — analiza datasetu krok po kroku](notebooks/analiza_dziennego_maksimum.ipynb)**
 
 > ⚠️ **Disclaimer:** narzędzie analityczne, **nie porada inwestycyjna i nie
 > gwarancja zysku**. SCW to mała, bardzo zmienna spółka; dane intraday z
