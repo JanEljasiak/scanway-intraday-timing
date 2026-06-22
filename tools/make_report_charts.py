@@ -865,6 +865,125 @@ def chart_peak_penalty():
     save("16_peak_kara.svg", p)
 
 
+# ----------------------------------------------------------------------------
+# 17. ANATOMIA JEDNEJ SESJI (model peak): 33 swiece -> p per swieca -> 1 alert
+# ----------------------------------------------------------------------------
+def chart_peak_anatomy():
+    """Najwazniejszy wykres: jak z 33 swiec model wybiera JEDNA = sygnal sprzedazy.
+    Liczony na realnej sesji testowej (out-of-sample) modelem peak."""
+    import numpy as np
+
+    from src.features import build_features
+    from src.peak import add_daily_high_target, train_peak_model
+
+    intraday, daily_ctx, cfg, is_real, _ = _load_real_or_synthetic()
+    feat_df, cols = build_features(intraday, daily_ctx, cfg)
+    feat_df = add_daily_high_target(feat_df)
+    days = sorted(feat_df["date"].unique())
+    hold = days[-1]
+    model = train_peak_model(feat_df[feat_df["date"] != hold], cols, cfg)
+    g = feat_df[feat_df["date"] == hold].sort_index()
+    proba = model.predict_proba(g[cols])[:, 1]
+    close = g["Close"].values
+    times = [t.strftime("%H:%M") for t in g["time"]]
+    n = len(close)
+    peak_i = int(close.argmax())
+    alert_i = int(proba.argmax())
+    thr = cfg.alert_probability_threshold
+    regret = (close[peak_i] - close[alert_i]) / close[peak_i] * 100
+
+    W, H = 860, 470
+    ml, mr = 55, 20
+    p1t, p1b = 56, 250
+    p2t, p2b = 300, 430
+    pw = W - ml - mr
+    pmin, pmax = close.min(), close.max()
+    pad = (pmax - pmin) * 0.18 or 1
+    pmin -= pad; pmax += pad
+
+    def X(i): return ml + pw * i / (n - 1)
+    def Yp(v): return p1t + (p1b - p1t) * (1 - (v - pmin) / (pmax - pmin))
+    def Yq(v): return p2t + (p2b - p2t) * (1 - v)
+
+    p = _svg_open(W, H)
+    p.append(_text(W / 2, 20, "Anatomia decyzji: 33 swiece -> prawdopodobienstwo -> JEDEN sygnal sprzedazy",
+                   14, "middle", C_TEXT, "bold"))
+    src = f"realna sesja {hold} (out-of-sample)" if is_real else "sesja syntetyczna"
+    p.append(_text(W / 2, 38, f"{src}: model wskazal {times[alert_i]}, szczyt byl o {times[peak_i]} "
+                   f"-> sprzedaz {regret:.2f}% ponizej maksimum", 10, "middle", C_GREEN))
+
+    # panel 1: cena
+    p.append(_text(ml, p1t - 6, "Cena (PLN)", 10, "start", C_TEXT, "bold"))
+    pts = " ".join(f"{X(i):.1f},{Yp(v):.1f}" for i, v in enumerate(close))
+    p.append(f'<polyline fill="none" stroke="{C_BLUE}" stroke-width="2" points="{pts}"/>')
+    # faktyczny szczyt
+    p.append(f'<circle cx="{X(peak_i):.1f}" cy="{Yp(close[peak_i]):.1f}" r="5" fill="{C_RED}"/>')
+    p.append(_text(X(peak_i), Yp(close[peak_i]) - 10, f"faktyczny szczyt {times[peak_i]}", 9, "middle", C_RED, "bold"))
+    # sygnal modelu (gwiazdka/pion)
+    xa = X(alert_i)
+    p.append(f'<line x1="{xa:.1f}" y1="{p1t}" x2="{xa:.1f}" y2="{p1b}" stroke="{C_GREEN}" stroke-width="1.5" stroke-dasharray="4 3"/>')
+    p.append(f'<circle cx="{xa:.1f}" cy="{Yp(close[alert_i]):.1f}" r="6" fill="none" stroke="{C_GREEN}" stroke-width="2.5"/>')
+    p.append(_text(xa, p1t - 2, f"SPRZEDAJ {times[alert_i]}", 10, "middle", C_GREEN, "bold"))
+    for i in range(0, n, 4):
+        p.append(_text(X(i), p1b + 14, times[i], 8, "middle", C_TEXT))
+
+    # panel 2: prawdopodobienstwo per swieca (slupki)
+    p.append(_text(ml, p2t - 6, "p(dzienne maksimum) dla KAZDEJ swiecy - model bierze najwyzszy slupek",
+                   10, "start", C_TEXT, "bold"))
+    for gv in [0.0, 0.5, 1.0]:
+        y = Yq(gv)
+        p.append(f'<line x1="{ml}" y1="{y:.1f}" x2="{ml+pw}" y2="{y:.1f}" stroke="{C_GRID}" stroke-width="1"/>')
+        p.append(_text(ml - 6, y + 3, f"{gv:.0%}", 8, "end", C_TEXT))
+    yth = Yq(thr)
+    p.append(f'<line x1="{ml}" y1="{yth:.1f}" x2="{ml+pw}" y2="{yth:.1f}" stroke="{C_RED}" stroke-width="1.3" stroke-dasharray="5 3"/>')
+    p.append(_text(ml + pw, yth - 4, f"prog {thr:.0%}", 9, "end", C_RED))
+    bw = pw / n * 0.6
+    for i, v in enumerate(proba):
+        cx = X(i)
+        col = C_GREEN if i == alert_i else C_GRAY
+        p.append(f'<rect x="{cx-bw/2:.1f}" y="{Yq(v):.1f}" width="{bw:.1f}" height="{Yq(0)-Yq(v):.1f}" fill="{col}" rx="1"/>')
+    p.append(_text(xa, Yq(proba[alert_i]) - 5, f"max = {proba[alert_i]:.0%}", 9, "middle", C_GREEN, "bold"))
+    save("17_peak_anatomia.svg", p)
+
+
+# ----------------------------------------------------------------------------
+# 18. PIPELINE: jak dziala model peak, krok po kroku (mapa na kod)
+# ----------------------------------------------------------------------------
+def chart_pipeline():
+    steps = [
+        ("1. Dane 15-min", "33 swiece/sesje (OHLCV)", "src/data_sources.py", "fetch_intraday_yf"),
+        ("2. Cechy per swieca", "VWAP, RSI, momentum, pora dnia, kontekst dzienny", "src/features.py", "build_features"),
+        ("3. Etykieta (target)", "1 swieca/dzien = najwyzszy Close", "src/peak.py", "add_daily_high_target"),
+        ("4. Model + strata", "regresja logistyczna, asymetryczna kara za przegapienie", "src/peak.py", "train_peak_model"),
+        ("5. Decyzja", "p dla kazdej swiecy -> argmax dnia -> 1 alert (jesli p>=prog)", "src/peak.py", "_sell_metrics_for_day"),
+        ("6. SPRZEDAJESZ", "jeden sygnal -> sprzedaz; ocena: regret + permutacja", "src/peak.py", "daily_peak_evaluation"),
+    ]
+    W = 860
+    bh, gap, mt = 58, 26, 50
+    H = mt + len(steps) * (bh + gap)
+    bw = 560
+    bx = (W - bw) / 2
+
+    p = _svg_open(W, H)
+    p.append(_text(W / 2, 24, "Jak dziala model dziennego maksimum - krok po kroku (mapa na kod)",
+                   14, "middle", C_TEXT, "bold"))
+    for i, (title, desc, f, fn) in enumerate(steps):
+        y = mt + i * (bh + gap)
+        last = i == len(steps) - 1
+        fill = "#eaf6ec" if last else "#f0f6ff"
+        stroke = C_GREEN if last else C_BLUE
+        p.append(f'<rect x="{bx:.1f}" y="{y:.1f}" width="{bw}" height="{bh}" rx="8" fill="{fill}" stroke="{stroke}" stroke-width="1.5"/>')
+        p.append(_text(bx + 14, y + 23, title, 13, "start", (C_GREEN if last else C_BLUE), "bold"))
+        p.append(_text(bx + 14, y + 41, desc, 10, "start", C_TEXT))
+        p.append(f'<text x="{bx+bw-12:.1f}" y="{y+bh-8:.1f}" font-size="9" text-anchor="end" '
+                 f'fill="{C_AXIS}" font-family="monospace">{f} : {fn}()</text>')
+        if not last:
+            ay = y + bh + gap / 2
+            p.append(f'<line x1="{W/2:.1f}" y1="{y+bh:.1f}" x2="{W/2:.1f}" y2="{ay+4:.1f}" stroke="{C_AXIS}" stroke-width="1.5"/>')
+            p.append(f'<polygon points="{W/2-5:.1f},{ay:.1f} {W/2+5:.1f},{ay:.1f} {W/2:.1f},{ay+6:.1f}" fill="{C_AXIS}"/>')
+    save("18_pipeline.svg", p)
+
+
 if __name__ == "__main__":
     print("Generuje wykresy SVG do docs/assets/ ...")
     chart_price()
@@ -883,4 +1002,6 @@ if __name__ == "__main__":
     chart_peak_regret()
     chart_peak_timeline()
     chart_peak_penalty()
+    chart_peak_anatomy()
+    chart_pipeline()
     print("Gotowe.")

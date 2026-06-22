@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 554" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<text x="430.0" y="24.0" font-size="14" text-anchor="middle" fill="#57606a" font-weight="bold">Jak dziala model dziennego maksimum - krok po kroku (mapa na kod)</text>
+<rect x="150.0" y="50.0" width="560" height="58" rx="8" fill="#f0f6ff" stroke="#0969da" stroke-width="1.5"/>
+<text x="164.0" y="73.0" font-size="13" text-anchor="start" fill="#0969da" font-weight="bold">1. Dane 15-min</text>
+<text x="164.0" y="91.0" font-size="10" text-anchor="start" fill="#57606a" font-weight="normal">33 swiece/sesje (OHLCV)</text>
+<text x="698.0" y="100.0" font-size="9" text-anchor="end" fill="#8b949e" font-family="monospace">src/data_sources.py : fetch_intraday_yf()</text>
+<line x1="430.0" y1="108.0" x2="430.0" y2="125.0" stroke="#8b949e" stroke-width="1.5"/>
+<polygon points="425.0,121.0 435.0,121.0 430.0,127.0" fill="#8b949e"/>
+<rect x="150.0" y="134.0" width="560" height="58" rx="8" fill="#f0f6ff" stroke="#0969da" stroke-width="1.5"/>
+<text x="164.0" y="157.0" font-size="13" text-anchor="start" fill="#0969da" font-weight="bold">2. Cechy per swieca</text>
+<text x="164.0" y="175.0" font-size="10" text-anchor="start" fill="#57606a" font-weight="normal">VWAP, RSI, momentum, pora dnia, kontekst dzienny</text>
+<text x="698.0" y="184.0" font-size="9" text-anchor="end" fill="#8b949e" font-family="monospace">src/features.py : build_features()</text>
+<line x1="430.0" y1="192.0" x2="430.0" y2="209.0" stroke="#8b949e" stroke-width="1.5"/>
+<polygon points="425.0,205.0 435.0,205.0 430.0,211.0" fill="#8b949e"/>
+<rect x="150.0" y="218.0" width="560" height="58" rx="8" fill="#f0f6ff" stroke="#0969da" stroke-width="1.5"/>
+<text x="164.0" y="241.0" font-size="13" text-anchor="start" fill="#0969da" font-weight="bold">3. Etykieta (target)</text>
+<text x="164.0" y="259.0" font-size="10" text-anchor="start" fill="#57606a" font-weight="normal">1 swieca/dzien = najwyzszy Close</text>
+<text x="698.0" y="268.0" font-size="9" text-anchor="end" fill="#8b949e" font-family="monospace">src/peak.py : add_daily_high_target()</text>
+<line x1="430.0" y1="276.0" x2="430.0" y2="293.0" stroke="#8b949e" stroke-width="1.5"/>
+<polygon points="425.0,289.0 435.0,289.0 430.0,295.0" fill="#8b949e"/>
+<rect x="150.0" y="302.0" width="560" height="58" rx="8" fill="#f0f6ff" stroke="#0969da" stroke-width="1.5"/>
+<text x="164.0" y="325.0" font-size="13" text-anchor="start" fill="#0969da" font-weight="bold">4. Model + strata</text>
+<text x="164.0" y="343.0" font-size="10" text-anchor="start" fill="#57606a" font-weight="normal">regresja logistyczna, asymetryczna kara za przegapienie</text>
+<text x="698.0" y="352.0" font-size="9" text-anchor="end" fill="#8b949e" font-family="monospace">src/peak.py : train_peak_model()</text>
+<line x1="430.0" y1="360.0" x2="430.0" y2="377.0" stroke="#8b949e" stroke-width="1.5"/>
+<polygon points="425.0,373.0 435.0,373.0 430.0,379.0" fill="#8b949e"/>
+<rect x="150.0" y="386.0" width="560" height="58" rx="8" fill="#f0f6ff" stroke="#0969da" stroke-width="1.5"/>
+<text x="164.0" y="409.0" font-size="13" text-anchor="start" fill="#0969da" font-weight="bold">5. Decyzja</text>
+<text x="164.0" y="427.0" font-size="10" text-anchor="start" fill="#57606a" font-weight="normal">p dla kazdej swiecy -> argmax dnia -> 1 alert (jesli p>=prog)</text>
+<text x="698.0" y="436.0" font-size="9" text-anchor="end" fill="#8b949e" font-family="monospace">src/peak.py : _sell_metrics_for_day()</text>
+<line x1="430.0" y1="444.0" x2="430.0" y2="461.0" stroke="#8b949e" stroke-width="1.5"/>
+<polygon points="425.0,457.0 435.0,457.0 430.0,463.0" fill="#8b949e"/>
+<rect x="150.0" y="470.0" width="560" height="58" rx="8" fill="#eaf6ec" stroke="#1a7f37" stroke-width="1.5"/>
+<text x="164.0" y="493.0" font-size="13" text-anchor="start" fill="#1a7f37" font-weight="bold">6. SPRZEDAJESZ</text>
+<text x="164.0" y="511.0" font-size="10" text-anchor="start" fill="#57606a" font-weight="normal">jeden sygnal -> sprzedaz; ocena: regret + permutacja</text>
+<text x="698.0" y="520.0" font-size="9" text-anchor="end" fill="#8b949e" font-family="monospace">src/peak.py : daily_peak_evaluation()</text>
+</svg>
